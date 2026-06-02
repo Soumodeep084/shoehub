@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
       const email = email_addresses[0]?.email_address;
 
-      await prisma.users.upsert({
+      await prisma.user.upsert({
         where: { clerkId: id },
         update: {},
         create: {
