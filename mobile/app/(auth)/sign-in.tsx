@@ -26,40 +26,61 @@ export default function SignIn() {
   const [resetMessage, setResetMessage] = useState("");
   const [resetError, setResetError] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
+  const [signInError, setSignInError] = useState("");
 
   const onSignInPress = async () => {
-    const { error } = await signIn.password({
-      emailAddress: email,
-      password,
-    });
+    setSignInError(""); // Clears old errors when you try again
 
-    if (error) {
-      return;
-    }
-
-    if (signIn.status === "complete") {
-      await signIn.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) {
-            console.log(session?.currentTask);
-            return;
-          }
-          const url = decorateUrl("/");
-          router.replace(url as any);
-        },
+    try {
+      const { error } = await signIn.password({
+        emailAddress: email,
+        password,
       });
-    } else if (signIn.status === "needs_second_factor") {
-      await signIn.mfa.sendPhoneCode();
-    } else if (signIn.status === "needs_client_trust") {
-      const emailCodeFactor = signIn.supportedSecondFactors.find(
-        (factor) => factor.strategy === "email_code",
+
+      if (error) {
+        setSignInError(error.message);
+        return;
+      }
+
+      console.log(
+        "Password sign-in successful, checking status...",
+        signIn.status,
       );
 
-      if (emailCodeFactor) {
-        await signIn.mfa.sendEmailCode();
+      if (signIn.status === "complete") {
+        await signIn.finalize({
+          navigate: ({ session, decorateUrl }) => {
+            if (session?.currentTask) {
+              console.log(session?.currentTask);
+              return;
+            }
+            const url = decorateUrl("/");
+            router.replace(url as any);
+          },
+        });
+      } else if (signIn.status === "needs_second_factor") {
+        await signIn.mfa.sendPhoneCode();
+      } else if (signIn.status === "needs_client_trust") {
+        const emailCodeFactor = signIn.supportedSecondFactors.find(
+          (factor) => factor.strategy === "email_code",
+        );
+
+        if (emailCodeFactor) {
+          await signIn.mfa.sendEmailCode();
+        }
+      } else {
+        console.error("Sign-In attempt not complete : \n", signIn);
       }
-    } else {
-      console.error("Sign-In attempt not complete : \n", signIn);
+    } catch (err: any) {
+      // 🚨 THIS IS WHAT YOU WERE MISSING!
+      // When Clerk rejects the login, it jumps down here.
+      console.error("Sign in error:", JSON.stringify(err, null, 2));
+
+      if (err.errors && err.errors.length > 0) {
+        setSignInError(err.errors[0].longMessage || err.errors[0].message);
+      } else {
+        setSignInError("Failed to sign in. Please check your credentials.");
+      }
     }
   };
 
@@ -140,6 +161,7 @@ export default function SignIn() {
       }
 
       if (signIn.status === "complete") {
+        console.log("Sign in complete");
         await signIn.finalize({
           navigate: ({ session, decorateUrl }) => {
             if (session?.currentTask) {
@@ -269,9 +291,7 @@ export default function SignIn() {
                 disabled={resetLoading}
                 className="py-2"
               >
-                <Text className="text-gray-600 font-semibold">
-                  Resend code
-                </Text>
+                <Text className="text-gray-600 font-semibold">Resend code</Text>
               </TouchableOpacity>
             </>
           )}
@@ -369,6 +389,12 @@ export default function SignIn() {
             <Text className="text-white font-bold text-base">Sign In</Text>
           )}
         </TouchableOpacity>
+
+        {signInError ? (
+          <Text className="text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+            {signInError}
+          </Text>
+        ) : null}
 
         <TouchableOpacity onPress={openResetFlow} className="py-2 mb-2">
           <Text className="text-slate-600 text-center font-semibold">

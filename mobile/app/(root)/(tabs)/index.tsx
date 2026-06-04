@@ -1,131 +1,232 @@
-import { useEffect, useMemo, useState } from "react";
-import { RefreshControl, ScrollView, View } from "react-native";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { RefreshControl, ScrollView, View, Text } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-import { CategorySection } from "@/components/home/CategorySection";
+import { PremiumStats } from "@/components/home/PremiumStats";
+import { CategoriesSection } from "@/components/home/CategorySection";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { HomeSkeleton } from "@/components/home/HomeSkeleton";
-import { PopularBrandsSection } from "@/components/home/PopularBrandsSection";
 import { ProductCarouselSection } from "@/components/home/ProductCarouselSection";
 import { SectionReveal } from "@/components/home/SectionReveal";
+import { PopularBrandsSection } from "@/components/home/PopularBrandsSection";
 
-import {
-  categories,
-  productImages,
-  products,
-} from "@/data/mock-data";
-import type { Product } from "@/types";
+import type { Category, Product } from "@/types";
+import { getGreeting } from "@/utils/home.utils";
+import { useUserStore } from "@/store/userStore";
+import { useCategoryStore } from "@/store/categoryStore";
+import { useBrandStore } from "@/store/brandStore"; // Linked Store Hook
+import { ENV } from "@/config/env";
+
+const BACKEND_URL = ENV.API_URL;
+if (!BACKEND_URL) {
+  throw new Error(
+    "BACKEND_URL is not defined. Please set EXPO_PUBLIC_BACKEND_URL in your environment variables.",
+  );
+}
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0].id);
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+
+  // 1. Data Fetching State Blocks
+  const [newArrivals, setNewArrivals] = useState<Product[]>([]);
+  const [trending, setTrending] = useState<Product[]>([]);
+  const [featured, setFeatured] = useState<Product[]>([]);
+
+  // 2. UI State Control
   const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // 3. Filter States (Defaulted cleanly to tracking states)
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+  const [selectedBrand, setSelectedBrand] = useState<string>("All");
+
+  // Global Store Access
+  const { categories, setCategories } = useCategoryStore();
+  const { brands, setBrands } = useBrandStore();
+
+  // --- DYNAMIC "ALL" ARRAYS FOR UI ---
+  const displayCategories = useMemo(() => {
+    const allCategory = {
+      id: "all",
+      name: "All",
+      description: "Everything",
+      imageUrl: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519",
+      isActive: true,
+    } as Category;
+
+    return [allCategory, ...categories];
+  }, [categories]);
+
+  const displayBrands = useMemo(() => {
+    return ["All", ...brands];
+  }, [brands]);
+
+  // --- REACTIVE API FETCH ACTIONS ---
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/categories`);
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data);
+      }
+    } catch (err) {
+      console.error("Categories error:", err);
+    }
+  }, [setCategories]);
+
+  const fetchBrands = useCallback(async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/brands`);
+      if (res.ok) {
+        const data = await res.json();
+        setBrands(data);
+      }
+    } catch (err) {
+      console.error("Brands error:", err);
+    }
+  }, [setBrands]);
+
+  const fetchNewArrivals = useCallback(
+    async (catId: string, brandName: string) => {
+      try {
+        let url = `${BACKEND_URL}/api/products?new=true&limit=10`;
+        if (catId !== "all") url += `&categoryId=${catId}`;
+        if (brandName !== "All") url += `&brand=${brandName}`;
+
+        const res = await fetch(url);
+        if (res.ok) setNewArrivals(await res.json());
+      } catch (err) {
+        console.error("New Arrivals error:", err);
+      }
+    },
+    [],
+  );
+
+  const fetchTrending = useCallback(
+    async (catId: string, brandName: string) => {
+      try {
+        let url = `${BACKEND_URL}/api/products?trending=true&limit=10`;
+        if (catId !== "all") url += `&categoryId=${catId}`;
+        if (brandName !== "All") url += `&brand=${brandName}`;
+
+        const res = await fetch(url);
+        if (res.ok) setTrending(await res.json());
+      } catch (err) {
+        console.error("Trending error:", err);
+      }
+    },
+    [],
+  );
+
+  const fetchFeatured = useCallback(
+    async (catId: string, brandName: string) => {
+      try {
+        let url = `${BACKEND_URL}/api/products?featured=true&limit=10`;
+        if (catId !== "all") url += `&categoryId=${catId}`;
+        if (brandName !== "All") url += `&brand=${brandName}`;
+
+        const res = await fetch(url);
+        if (res.ok) setFeatured(await res.json());
+      } catch (err) {
+        console.error("Featured error:", err);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 850);
-    return () => clearTimeout(timer);
+    const loadInitialData = async () => {
+      setIsLoading(true);
+      await Promise.all([
+        fetchCategories(),
+        fetchBrands(),
+        fetchNewArrivals("all", "All"),
+        fetchTrending("all", "All"),
+        fetchFeatured("all", "All"),
+      ]);
+      setIsLoading(false);
+    };
+
+    loadInitialData();
   }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 900);
+  // --- FILTER LISTENER (Runs every time the user taps a chip) ---
+  useEffect(() => {
+    if (isLoading) return;
+
+    const reFetchProducts = async () => {
+      await Promise.all([
+        fetchNewArrivals(selectedCategoryId, selectedBrand),
+        fetchTrending(selectedCategoryId, selectedBrand),
+        fetchFeatured(selectedCategoryId, selectedBrand),
+      ]);
+    };
+
+    reFetchProducts();
+  }, [
+    selectedCategoryId,
+    selectedBrand,
+    fetchNewArrivals,
+    fetchTrending,
+    fetchFeatured,
+    isLoading,
+  ]);
+
+  // --- GESTURE PULL-TO-REFRESH HANDLER ---
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    setSelectedCategoryId("all");
+    setSelectedBrand("All");
+
+    await Promise.all([
+      fetchCategories(),
+      fetchBrands(),
+      fetchNewArrivals("all", "All"),
+      fetchTrending("all", "All"),
+      fetchFeatured("all", "All"),
+    ]);
+    setIsRefreshing(false);
   };
 
-  const activeCategory = useMemo(
-    () => categories.find((category) => category.id === selectedCategoryId) ?? categories[0],
-    [selectedCategoryId]
+  // --- MEMOIZED DATA SELECTORS ---
+  const activeCategory = useMemo(() => {
+    if (categories.length === 0) return null;
+    if (selectedCategoryId === "all") return categories[0];
+    return categories.find((c) => c.id === selectedCategoryId) ?? categories[0];
+  }, [categories, selectedCategoryId]);
+
+  const getProductImageUrl = useCallback(
+    (product: Product) => {
+      if (product.images && product.images.length > 0) {
+        const primary = product.images.find((img) => img.isPrimary);
+        return primary ? primary.imageUrl : product.images[0].imageUrl;
+      }
+      return activeCategory?.imageUrl ?? "";
+    },
+    [activeCategory],
   );
 
-  const filteredCatalog = useMemo(
-    () =>
-      products.filter(
-        (product) =>
-          product.isActive &&
-          (selectedBrand ? product.brand === selectedBrand : true)
-      ),
-    [selectedBrand]
-  );
-
-  const catalogByCategory = useMemo(
-    () => filteredCatalog.filter((product) => product.categoryId === selectedCategoryId),
-    [filteredCatalog, selectedCategoryId]
-  );
-
-  const featuredProducts = useMemo(
-    () => catalogByCategory.filter((product) => product.isFeatured),
-    [catalogByCategory]
-  );
-
-  const newArrivals = useMemo(
-    () => catalogByCategory.filter((product) => product.isNew),
-    [catalogByCategory]
-  );
-
-  const trendingProducts = useMemo(
-    () =>
-      [...catalogByCategory]
-        .sort((a, b) => {
-          const scoreA = a.soldCount + a.averageRating * 100;
-          const scoreB = b.soldCount + b.averageRating * 100;
-
-          return scoreB - scoreA;
-        })
-        .slice(0, 8),
-    [catalogByCategory]
-  );
-
-  const primaryProductImageMap = useMemo(
-    () =>
-      new Map(
-        productImages
-          .filter((image) => image.isPrimary)
-          .map((image) => [image.productId, image.imageUrl])
-      ),
-    []
-  );
-
-  const categoryImageMap = useMemo(
-    () => new Map(categories.map((category) => [category.id, category.imageUrl])),
-    []
-  );
-
-  const getProductImageUrl = (product: Product) =>
-    primaryProductImageMap.get(product.id) ??
-    categoryImageMap.get(product.categoryId) ??
-    categories[0].imageUrl;
-
-  const heroSource = useMemo(() => {
-    const ordered = [
-      ...featuredProducts,
-      ...newArrivals,
-      ...trendingProducts,
-      ...catalogByCategory,
-      ...filteredCatalog,
-      ...products,
-    ];
-
-    return ordered.filter(
-      (product, index, array) => array.findIndex((item) => item.id === product.id) === index
+  const heroSlides = useMemo(() => {
+    const combinedProducts = [...featured, ...newArrivals, ...trending];
+    const uniqueProducts = combinedProducts.filter(
+      (product, index, self) =>
+        self.findIndex((p) => p.id === product.id) === index,
     );
-  }, [catalogByCategory, featuredProducts, filteredCatalog, newArrivals, trendingProducts]);
 
-  const heroSlides = useMemo(
-    () =>
-      heroSource.slice(0, 4).map((product) => ({
-        product,
-        image: getProductImageUrl(product),
-        title: product.name,
-        subtitle: activeCategory.name,
-        ctaLabel: "Shop Now",
-      })),
-    [activeCategory.name, heroSource]
-  );
+    return uniqueProducts.slice(0, 4).map((product) => ({
+      product,
+      image: getProductImageUrl(product),
+      title: product.name,
+      subtitle: activeCategory?.name || "Featured Item",
+      ctaLabel: "Shop Now",
+    }));
+  }, [featured, newArrivals, trending, activeCategory, getProductImageUrl]);
 
-  const handleSeeAll = () => router.push("/search");
+  // User Profile Greeting Parsing
+  const firstName = useUserStore((state) => state.firstName);
+  const subGreeting = "Fresh drops. Built for collectors.";
+  const greeting = getGreeting(firstName);
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -137,74 +238,133 @@ export default function HomeScreen() {
           bounces
           decelerationRate="fast"
           stickyHeaderIndices={[0]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111827" />}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor="#111827"
+            />
+          }
         >
+          {/* Header */}
           <View className="bg-white">
             <HomeHeader
-              greeting="Good morning, sneakerhead."
-              subGreeting="Discover curated drops, limited runs, and the cleanest pairs in the game."
-              avatarLabel="JD"
               onSearchPress={() => router.push("/search")}
               onWishlistPress={() => router.push("/wishlist")}
               onAvatarPress={() => router.push("/profile")}
             />
           </View>
 
+          {/* Greeting */}
+          <View className="mt-0 px-6">
+            <Text className="mt-2 text-[20px] font-bold leading-9 tracking-tight text-zinc-900">
+              {greeting}
+            </Text>
+            <Text className="mt-1 text-base leading-6 text-zinc-500">
+              {subGreeting}
+            </Text>
+          </View>
+
+          {/* Hero Slider */}
           <SectionReveal delay={60}>
             <HeroCarousel slides={heroSlides} />
           </SectionReveal>
 
-          <SectionReveal delay={120}>
-            <CategorySection
-              categories={categories.filter((category) => category.isActive)}
-              selectedCategoryId={selectedCategoryId}
-              onSelectCategory={setSelectedCategoryId}
-            />
-          </SectionReveal>
+          {/* Premium Stats */}
+          <PremiumStats />
 
-          <SectionReveal delay={180}>
-            <ProductCarouselSection
-              title={`Featured Drops${selectedBrand ? ` · ${selectedBrand}` : ""}`}
-              subtitle={`Curated releases in ${activeCategory.name.toLowerCase()}.`}
-              products={featuredProducts}
-              getImageUrl={getProductImageUrl}
-              onSeeAll={handleSeeAll}
-              emptyLabel={`No featured drops right now for ${activeCategory.name.toLowerCase()}. Try another brand or category.`}
-            />
-          </SectionReveal>
+          {/* Categories */}
+          <CategoriesSection
+            categories={displayCategories}
+            onCategoryPress={(cat) => setSelectedCategoryId(cat.id)}
+          />
 
+          {/* Brands */}
+          {brands.length > 0 && (
+            <SectionReveal delay={120}>
+              <PopularBrandsSection
+                brands={displayBrands}
+                selectedBrand={selectedBrand}
+                onSelectBrand={(brand) => setSelectedBrand(brand)}
+              />
+            </SectionReveal>
+          )}
+
+          {/* New Arrivals */}
           <SectionReveal delay={240}>
             <ProductCarouselSection
               title="Just Landed"
               subtitle="The freshest arrivals with premium comfort and new-season energy."
               products={newArrivals}
               getImageUrl={getProductImageUrl}
-              onSeeAll={handleSeeAll}
+              onSeeAll={() => {
+                router.push({
+                  pathname: "/search",
+                  params: {
+                    new: "true",
+                    category:
+                      selectedCategoryId !== "all"
+                        ? selectedCategoryId
+                        : undefined,
+                    brand: selectedBrand !== "All" ? selectedBrand : undefined,
+                  },
+                });
+              }}
               emptyLabel="No new arrivals in this selection yet."
             />
           </SectionReveal>
 
+          {/* Trending Now */}
           <SectionReveal delay={300}>
             <ProductCarouselSection
               title="Trending Now"
               subtitle="Sorted by sold count and rating for the strongest signal."
-              products={trendingProducts}
+              products={trending}
               getImageUrl={getProductImageUrl}
-              onSeeAll={handleSeeAll}
+              onSeeAll={() => {
+                router.push({
+                  pathname: "/search",
+                  params: {
+                    sort: "trending",
+                    category:
+                      selectedCategoryId !== "all"
+                        ? selectedCategoryId
+                        : undefined,
+                    brand: selectedBrand !== "All" ? selectedBrand : undefined,
+                  },
+                });
+              }}
               emptyLabel="Nothing trending in this filter. Switch the category or brand to explore more."
             />
           </SectionReveal>
 
+          {/* Featured Collections */}
           <SectionReveal delay={360}>
-            <PopularBrandsSection
-              brands={["Nike", "Adidas", "Jordan", "New Balance"]}
-              selectedBrand={selectedBrand ?? undefined}
-              onSelectBrand={(brand) => setSelectedBrand((current) => (current === brand ? null : brand))}
+            <ProductCarouselSection
+              title="Most Loved"
+              subtitle="Top-rated sneakers loved by thousands of sneakerheads."
+              products={featured}
+              getImageUrl={getProductImageUrl}
+              onSeeAll={() => {
+                router.push({
+                  pathname: "/search",
+                  params: {
+                    sort: "featured",
+                    category:
+                      selectedCategoryId !== "all"
+                        ? selectedCategoryId
+                        : undefined,
+                    brand: selectedBrand !== "All" ? selectedBrand : undefined,
+                  },
+                });
+              }}
+              emptyLabel="No highly rated products available."
             />
           </SectionReveal>
 
           <View className="h-12" />
-        </ScrollView>)}
+        </ScrollView>
+      )}
     </SafeAreaView>
-  )
+  );
 }

@@ -96,7 +96,7 @@ export default function SignUp() {
         <TouchableOpacity
           onPress={onVerifyPress}
           disabled={isLoading}
-          className="w-full bg-emerald-600 py-4 rounded-xl items-center mb-4"
+          className="w-full bg-black py-4 rounded-xl items-center mb-4"
         >
           {isLoading ? (
             <ActivityIndicator color="white" />
