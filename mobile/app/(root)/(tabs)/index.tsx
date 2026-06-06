@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // 3. Filter States (Defaulted cleanly to tracking states)
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("All");
   const [selectedBrand, setSelectedBrand] = useState<string>("All");
 
   // Global Store Access
@@ -48,7 +48,7 @@ export default function HomeScreen() {
   // --- DYNAMIC "ALL" ARRAYS FOR UI ---
   const displayCategories = useMemo(() => {
     const allCategory = {
-      id: "all",
+      id: "All",
       name: "All",
       description: "Everything",
       imageUrl: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519",
@@ -91,7 +91,7 @@ export default function HomeScreen() {
     async (catId: string, brandName: string) => {
       try {
         let url = `${BACKEND_URL}/api/products?new=true&limit=10`;
-        if (catId !== "all") url += `&categoryId=${catId}`;
+        if (catId !== "All") url += `&categoryId=${catId}`;
         if (brandName !== "All") url += `&brand=${brandName}`;
 
         const res = await fetch(url);
@@ -107,7 +107,7 @@ export default function HomeScreen() {
     async (catId: string, brandName: string) => {
       try {
         let url = `${BACKEND_URL}/api/products?trending=true&limit=10`;
-        if (catId !== "all") url += `&categoryId=${catId}`;
+        if (catId !== "All") url += `&categoryId=${catId}`;
         if (brandName !== "All") url += `&brand=${brandName}`;
 
         const res = await fetch(url);
@@ -123,7 +123,7 @@ export default function HomeScreen() {
     async (catId: string, brandName: string) => {
       try {
         let url = `${BACKEND_URL}/api/products?featured=true&limit=10`;
-        if (catId !== "all") url += `&categoryId=${catId}`;
+        if (catId !== "All") url += `&categoryId=${catId}`;
         if (brandName !== "All") url += `&brand=${brandName}`;
 
         const res = await fetch(url);
@@ -141,9 +141,9 @@ export default function HomeScreen() {
       await Promise.all([
         fetchCategories(),
         fetchBrands(),
-        fetchNewArrivals("all", "All"),
-        fetchTrending("all", "All"),
-        fetchFeatured("all", "All"),
+        fetchNewArrivals("All", "All"),
+        fetchTrending("All", "All"),
+        fetchFeatured("All", "All"),
       ]);
       setIsLoading(false);
     };
@@ -176,15 +176,15 @@ export default function HomeScreen() {
   // --- GESTURE PULL-TO-REFRESH HANDLER ---
   const onRefresh = async () => {
     setIsRefreshing(true);
-    setSelectedCategoryId("all");
+    setSelectedCategoryId("All");
     setSelectedBrand("All");
 
     await Promise.all([
       fetchCategories(),
       fetchBrands(),
-      fetchNewArrivals("all", "All"),
-      fetchTrending("all", "All"),
-      fetchFeatured("all", "All"),
+      fetchNewArrivals("All", "All"),
+      fetchTrending("All", "All"),
+      fetchFeatured("All", "All"),
     ]);
     setIsRefreshing(false);
   };
@@ -192,7 +192,7 @@ export default function HomeScreen() {
   // --- MEMOIZED DATA SELECTORS ---
   const activeCategory = useMemo(() => {
     if (categories.length === 0) return null;
-    if (selectedCategoryId === "all") return categories[0];
+    if (selectedCategoryId === "All") return categories[0];
     return categories.find((c) => c.id === selectedCategoryId) ?? categories[0];
   }, [categories, selectedCategoryId]);
 
@@ -301,9 +301,10 @@ export default function HomeScreen() {
                 router.push({
                   pathname: "/search",
                   params: {
-                    new: "true",
+                    openFilters: "true",
+                    sort: "newest",
                     category:
-                      selectedCategoryId !== "all"
+                      selectedCategoryId !== "All"
                         ? selectedCategoryId
                         : undefined,
                     brand: selectedBrand !== "All" ? selectedBrand : undefined,
@@ -325,9 +326,10 @@ export default function HomeScreen() {
                 router.push({
                   pathname: "/search",
                   params: {
+                    openFilters: "true",
                     sort: "trending",
                     category:
-                      selectedCategoryId !== "all"
+                      selectedCategoryId !== "All"
                         ? selectedCategoryId
                         : undefined,
                     brand: selectedBrand !== "All" ? selectedBrand : undefined,
@@ -349,9 +351,10 @@ export default function HomeScreen() {
                 router.push({
                   pathname: "/search",
                   params: {
+                    openFilters: "true",
                     sort: "featured",
                     category:
-                      selectedCategoryId !== "all"
+                      selectedCategoryId !== "All"
                         ? selectedCategoryId
                         : undefined,
                     brand: selectedBrand !== "All" ? selectedBrand : undefined,

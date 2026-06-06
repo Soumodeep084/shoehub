@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useUser } from "@clerk/expo";
-
 import { useUserStore } from "@/store/userStore";
 
 export default function ClerkUserSync() {

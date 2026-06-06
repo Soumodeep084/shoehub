@@ -2,7 +2,7 @@ import { ClerkProvider } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { Slot } from "expo-router";
 import "../global.css";
-import ClerkUserSync from "@/components/ClerkUserSync";
+import ClerkUserSync from "@/hooks/ClerkUserSync";
 import {
   configureReanimatedLogger,
   ReanimatedLogLevel,

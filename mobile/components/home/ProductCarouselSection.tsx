@@ -1,4 +1,4 @@
-import { ProductCard } from "@/components/products/ProductCard";
+import { ProductCard } from "@/components/home/HomeProductCard";
 import type { Product } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -77,11 +77,10 @@ export function ProductCarouselSection({
               categoryId={item.categoryId}
               brand={item.brand}
               name={item.name}
-              price={item.salePrice}
+              salePrice={item.salePrice}
               originalPrice={item.basePrice}
               discountPercent={item.discountPercent}
               rating={parseFloat(item.averageRating)}
-              reviewCount={item.ratingCount}
               onPress={() => router.push(`/product/${item.id}`)}
             />
           )}

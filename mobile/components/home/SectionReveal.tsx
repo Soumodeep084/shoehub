@@ -27,7 +27,7 @@ export function SectionReveal({ children, delay = 0 }: SectionRevealProps) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [delay]);
+  }, [opacity, translateY, delay]);
 
   return (
     <Animated.View

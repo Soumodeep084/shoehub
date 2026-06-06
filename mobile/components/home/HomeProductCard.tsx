@@ -9,11 +9,10 @@ type ProductCardProps = {
   brand: string;
   categoryId: string;
   name: string;
-  price: string;
+  salePrice: string;
   originalPrice?: string;
   discountPercent?: number;
   rating: number;
-  reviewCount: number;
   isWishlisted?: boolean;
   onPress?: () => void;
   onWishlistPress?: () => void;
@@ -24,11 +23,10 @@ export function ProductCard({
   brand,
   categoryId,
   name,
-  price,
+  salePrice,
   originalPrice,
   discountPercent,
   rating,
-  reviewCount,
   isWishlisted,
   onPress,
   onWishlistPress,
@@ -43,6 +41,7 @@ export function ProductCard({
       bounciness: 6,
     }).start();
   };
+
   const category = useCategoryStore((state) =>
     state.categories.find((c) => c.id === categoryId),
   );
@@ -86,7 +85,7 @@ export function ProductCard({
         </View>
 
         {/* Info Area */}
-        <View className="mt-2 gap-1 px-1">
+        <View className="mt-2 gap-1 px-2">
           <Text className="text-[10px] font-bold uppercase tracking-[1.5px] text-zinc-600">
             {brand} - {category?.name || "Unknown Category"}
           </Text>
@@ -100,7 +99,7 @@ export function ProductCard({
 
           <View className="flex-row items-baseline gap-2">
             <Text className="text-lg font-black text-zinc-950">
-              {formatPrice(price)}
+              {formatPrice(salePrice)}
             </Text>
 
             {originalPrice && originalPrice && (
@@ -110,11 +109,10 @@ export function ProductCard({
             )}
           </View>
 
-          <View className="mt-1 flex-row items-center gap-1">
+          <View className="flex-row items-center gap-1 px-2">
             <Ionicons name="star" size={13} color="#f59e0b" />
             <Text className="text-xs font-semibold text-zinc-500">
               {rating.toFixed(1)} {"   "}
-              {reviewCount.toLocaleString()} reviews
             </Text>
           </View>
         </View>
