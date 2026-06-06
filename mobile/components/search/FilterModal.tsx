@@ -11,7 +11,7 @@ import { useCategoryStore } from "@/store/categoryStore";
 import { useBrandStore } from "@/store/brandStore";
 import { useFilterStore, SortByType } from "@/store/filterStore";
 import { Ionicons } from "@expo/vector-icons";
-import { SIZES, PRICE_PRESETS, SORT_BY } from "@/utils/filter.utils";
+import { SIZES, PRICE_PRESETS, SORT_BY } from "@/constants/filter.data";
 
 export function FilterModal({
   isVisible,

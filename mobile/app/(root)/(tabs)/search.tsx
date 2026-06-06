@@ -51,8 +51,6 @@ const Search = () => {
     brand?: string;
   }>();
 
-  console.log("Search Screen Params:", params); // Debug log to verify incoming parameters
-
   // Local UI States
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -286,7 +284,7 @@ const Search = () => {
                 isWishlisted={false}
               />
             )}
-            contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 10 }} // Added horizontal padding to match card gaps
+            contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 5 }} 
             ListEmptyComponent={
               <View className="flex-1 items-center justify-center pt-24">
                 <Text className="text-zinc-400 font-medium text-base mt-4 text-center">
