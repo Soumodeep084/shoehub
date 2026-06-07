@@ -28,6 +28,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  wishlists Wishlist[]
+
   @@index([clerkId])
   @@index([email])
   @@index([id])
@@ -49,26 +51,29 @@ model Category {
 }
 
 model Product {
-  id              String           @id @default(uuid())
+  id              String   @id @default(uuid())
   categoryId      String
   name            String
-  slug            String           @unique
+  slug            String   @unique
   brand           String
   description     String
-  basePrice       Decimal          @db.Decimal(10, 2)
-  salePrice       Decimal          @db.Decimal(10, 2)
-  discountPercent Int              @default(0)
-  averageRating   Decimal          @default(0) @db.Decimal(2, 1)
-  ratingCount     Int              @default(0)
-  soldCount       Int              @default(0)
-  isFeatured      Boolean          @default(false)
-  isNew           Boolean          @default(false)
-  isActive        Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  category        Category         @relation(fields: [categoryId], references: [id])
-  images          ProductImage[]
-  variants        ProductVariant[]
+  basePrice       Decimal  @db.Decimal(10, 2)
+  salePrice       Decimal  @db.Decimal(10, 2)
+  discountPercent Int      @default(0)
+  averageRating   Decimal  @default(0) @db.Decimal(2, 1)
+  ratingCount     Int      @default(0)
+  soldCount       Int      @default(0)
+  isFeatured      Boolean  @default(false)
+  isNew           Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  category Category @relation(fields: [categoryId], references: [id])
+
+  images    ProductImage[]
+  variants  ProductVariant[]
+  wishlists Wishlist[]
 
   @@index([categoryId])
   @@index([brand])
@@ -80,12 +85,13 @@ model Product {
 model ProductImage {
   id          String   @id @default(uuid())
   productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   imageUrl    String
   storagePath String
   isPrimary   Boolean  @default(false)
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@map("product_images")
@@ -99,8 +105,23 @@ model ProductVariant {
   sku       String   @unique
   stock     Int      @default(0)
   createdAt DateTime @default(now())
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@map("product_variants")
+}
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("wishlists")
 }
