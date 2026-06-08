@@ -1,8 +1,11 @@
-import { ProductCard } from "@/components/home/HomeProductCard";
+import { HomeProductCard } from "@/components/home/HomeProductCard";
+import { useWishlistStore } from "@/store/wishlistStore";
 import type { Product } from "@/types";
+import { useAuth } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { FlatList, Text, TouchableOpacity, View } from "react-native";
+import Toast from "react-native-toast-message";
 
 type ProductCarouselSectionProps = {
   title: string;
@@ -13,17 +16,61 @@ type ProductCarouselSectionProps = {
   emptyLabel?: string;
 };
 
-export function ProductCarouselSection({
+export const ProductCarouselSection = ({
   title,
   subtitle,
   products,
   getImageUrl,
   onSeeAll,
   emptyLabel = "No sneakers matched this selection yet.",
-}: ProductCarouselSectionProps) {
+}: ProductCarouselSectionProps) => {
   const router = useRouter();
+  const { getToken } = useAuth();
 
   const handleSeeAll = onSeeAll ?? (() => router.push("/search"));
+
+  const { toggleWishlist, isWishlisted } = useWishlistStore();
+
+  const handleWishlistToggle = async (item: Product) => {
+    try {
+      const token = await getToken();
+
+      if (!token) {
+        Toast.show({
+          type: "error",
+          text1: "Login required",
+          text2: "Please log in to use wishlist",
+        });
+        return;
+      }
+
+      await toggleWishlist(token, {
+        productId: item.id,
+        name: item.name,
+        brand: item.brand,
+        basePrice: Number(item.basePrice),
+        salePrice: Number(item.salePrice),
+        discountPercent: item.discountPercent,
+        averageRating: Number(item.averageRating),
+        baseImageUrl: getImageUrl(item),
+        categoryId: item.categoryId,
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Wishlist updated",
+        text2: "Your changes were saved",
+      });
+    } catch (error) {
+      console.error(error);
+
+      Toast.show({
+        type: "error",
+        text1: "Something went wrong",
+        text2: "Please try again later",
+      });
+    }
+  };
 
   return (
     <View className="mt-8">
@@ -72,7 +119,7 @@ export function ProductCarouselSection({
           ListHeaderComponent={<View className="w-6" />}
           ListFooterComponent={<View className="w-6" />}
           renderItem={({ item }) => (
-            <ProductCard
+            <HomeProductCard
               image={getImageUrl(item)}
               categoryId={item.categoryId}
               brand={item.brand}
@@ -82,10 +129,12 @@ export function ProductCarouselSection({
               discountPercent={item.discountPercent}
               rating={parseFloat(item.averageRating)}
               onPress={() => router.push(`/product/${item.id}`)}
+              isWishlisted={isWishlisted(item.id)}
+              onWishlistToggle={() => handleWishlistToggle(item)}
             />
           )}
         />
       )}
     </View>
   );
-}
+};

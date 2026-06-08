@@ -25,7 +25,7 @@ type HeroCarouselProps = {
   slides: HeroSlide[];
 };
 
-export function HeroCarousel({ slides }: HeroCarouselProps) {
+export const  HeroCarousel = ({ slides }: HeroCarouselProps) => {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const itemWidth = width - 32;
@@ -38,7 +38,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   );
 
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+    ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
       const index = viewableItems[0]?.index ?? 0;
       setActiveIndex(index);
     },

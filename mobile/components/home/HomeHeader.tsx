@@ -8,11 +8,11 @@ type HomeHeaderProps = {
   onAvatarPress?: () => void;
 };
 
-export function HomeHeader({
+export const HomeHeader = ({
   onSearchPress,
   onWishlistPress,
   onAvatarPress,
-}: HomeHeaderProps) {
+}: HomeHeaderProps) => {
   const avatarLabel = useUserStore((state) => state.avatarLabel);
 
   return (
@@ -70,4 +70,4 @@ export function HomeHeader({
       </View>
     </View>
   );
-}
+};

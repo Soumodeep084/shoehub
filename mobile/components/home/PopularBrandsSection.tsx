@@ -6,11 +6,11 @@ type PopularBrandsSectionProps = {
   onSelectBrand?: (brand: string) => void;
 };
 
-export function PopularBrandsSection({
+export const PopularBrandsSection = ({
   brands,
   selectedBrand,
   onSelectBrand,
-}: PopularBrandsSectionProps) {
+}: PopularBrandsSectionProps) => {
   return (
     <View className="mt-12">
       <View className="mb-5 px-6">
@@ -44,4 +44,4 @@ export function PopularBrandsSection({
       />
     </View>
   );
-}
+};

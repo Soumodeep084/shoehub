@@ -10,7 +10,6 @@ import { HomeSkeleton } from "@/components/home/HomeSkeleton";
 import { ProductCarouselSection } from "@/components/home/ProductCarouselSection";
 import { SectionReveal } from "@/components/home/SectionReveal";
 import { PopularBrandsSection } from "@/components/home/PopularBrandsSection";
-
 import type { Category, Product } from "@/types";
 import { getGreeting } from "@/utils/home.utils";
 import { useUserStore } from "@/store/userStore";
@@ -149,7 +148,7 @@ export default function HomeScreen() {
     };
 
     loadInitialData();
-  }, []);
+  }, [fetchBrands, fetchCategories, fetchFeatured, fetchNewArrivals, fetchTrending]);
 
   // --- FILTER LISTENER (Runs every time the user taps a chip) ---
   useEffect(() => {

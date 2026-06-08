@@ -5,9 +5,6 @@ import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { Platform } from "react-native";
 
 function AndroidTabs() {
-  // const isAdmin = useUserStore((state) => state.isAdmin);
-  const isAdmin = true;
-
   return (
     <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen
@@ -48,7 +45,7 @@ function AndroidTabs() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="heart" color={color} size={size} />
           ),
-      }}
+        }}
       />
 
       <Tabs.Screen
@@ -75,9 +72,6 @@ function AndroidTabs() {
 }
 
 function IOSTabs() {
-  // const isAdmin = useUserStore((state) => state.isAdmin);
-  const isAdmin = true;
-
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -90,16 +84,16 @@ function IOSTabs() {
         <Label>Search</Label>
       </NativeTabs.Trigger>
 
-      {isAdmin && (
+      {/* {isAdmin && (
         <NativeTabs.Trigger name="create">
           <Icon sf="plus.circle.fill" />
-          <Label>Add Property</Label>
+          <Label>create</Label>
         </NativeTabs.Trigger>
-      )}
+      )} */}
 
       <NativeTabs.Trigger name="wishlist">
         <Icon sf="heart.fill" />
-        <Label>Saved</Label>
+        <Label>WishList</Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="cart">

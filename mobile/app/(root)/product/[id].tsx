@@ -1,354 +1,3 @@
-// import React, { useEffect, useState, useMemo, useRef } from "react";
-// import {
-//   View,
-//   Text,
-//   ScrollView,
-//   Image,
-//   TouchableOpacity,
-//   ActivityIndicator,
-//   Dimensions,
-//   FlatList,
-// } from "react-native";
-// import { SafeAreaView } from "react-native-safe-area-context";
-// import { useLocalSearchParams, useRouter } from "expo-router";
-// import { Ionicons } from "@expo/vector-icons";
-// import { formatPrice } from "@/utils/price.utils";
-// import type { Product } from "@/types";
-// import { ENV } from "@/config/env";
-// import MeasurementChartModal from "@/components/products/MeasurementChartModal";
-
-// const { width: SCREEN_WIDTH } = Dimensions.get("window");
-// const BACKEND_URL = ENV.API_URL;
-
-// export default function ProductDetailScreen() {
-//   const { id } = useLocalSearchParams<{ id: string }>();
-//   const router = useRouter();
-//   const mainListRef = useRef<FlatList>(null);
-
-//   // Data & UI State Management
-//   const [product, setProduct] = useState<Product | null>(null);
-//   const [isLoading, setIsLoading] = useState(true);
-//   const [activeImageIndex, setActiveImageIndex] = useState(0);
-//   const [selectedSize, setSelectedSize] = useState<string | null>(null);
-//   const [sizeChartVisible, setSizeChartVisible] = useState(false);
-
-//   // Fetch individual product payload
-//   useEffect(() => {
-//     if (!id) return;
-//     const fetchProductDetails = async () => {
-//       try {
-//         setIsLoading(true);
-//         const res = await fetch(`${BACKEND_URL}/api/products/${id}`);
-//         if (res.ok) {
-//           const data = await res.json();
-//           setProduct(data);
-
-//           if (data.variants && data.variants.length > 0) {
-//             const firstInStock = data.variants.find((v: any) => v.stock > 0);
-//             if (firstInStock) setSelectedSize(firstInStock.size);
-//           }
-//         }
-//       } catch (error) {
-//         console.error("Error fetching product detail:", error);
-//       } finally {
-//         setIsLoading(false);
-//       }
-//     };
-
-//     fetchProductDetails();
-//   }, [id]);
-
-//   // Track sorted gallery images
-//   const sortedImages = useMemo(() => {
-//     if (!product?.images || product.images.length === 0) {
-//       return [
-//         {
-//           id: "placeholder",
-//           imageUrl:
-//             "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519",
-//         },
-//       ];
-//     }
-//     return [...product.images].sort((a, b) => {
-//       if (a.isPrimary) return -1;
-//       if (b.isPrimary) return 1;
-//       return a.sortOrder - b.sortOrder;
-//     });
-//   }, [product]);
-
-//   // Extract unique sorted sizes dynamically
-//   const uniqueSizes = useMemo(() => {
-//     if (!product?.variants) return [];
-//     const sizesMap = product.variants.map((v) => v.size);
-//     return Array.from(new Set(sizesMap)).sort(
-//       (a, b) => parseFloat(a) - parseFloat(b),
-//     );
-//   }, [product]);
-
-//   const scrollToImage = (index: number) => {
-//     setActiveImageIndex(index);
-//     mainListRef.current?.scrollToIndex({ index, animated: true });
-//   };
-
-//   if (isLoading) {
-//     return (
-//       <View className="flex-1 bg-zinc-50 items-center justify-center">
-//         <ActivityIndicator size="large" color="#18181b" />
-//       </View>
-//     );
-//   }
-
-//   if (!product) {
-//     return (
-//       <View className="flex-1 bg-zinc-50 items-center justify-center p-6">
-//         <Text className="text-zinc-900 font-bold text-lg">
-//           Product Not Found
-//         </Text>
-//         <TouchableOpacity
-//           className="mt-4 bg-zinc-900 px-6 py-2.5 rounded-full"
-//           onPress={() => router.back()}
-//         >
-//           <Text className="text-white font-semibold">Go Back</Text>
-//         </TouchableOpacity>
-//       </View>
-//     );
-//   }
-
-//   const parsedRating = parseFloat(product.averageRating || "0");
-
-//   return (
-//     <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
-//       {/* 1. FIXED PREMIUM HEADER BAR WITH EXPLICIT BACK NAVIGATION */}
-//       <View className="flex-row items-center justify-between px-4 py-3 border-b border-zinc-100">
-//         <TouchableOpacity
-//           onPress={() => router.back()}
-//           className="flex-row items-center gap-1 py-1.5 pr-3"
-//           activeOpacity={0.7}
-//         >
-//           <Ionicons name="arrow-back" size={22} color="#18181b" />
-//           <Text className="text-sm font-bold text-zinc-900 tracking-tight">
-//             Back to Shop
-//           </Text>
-//         </TouchableOpacity>
-
-//         <Text
-//           className="text-xs font-black uppercase tracking-widest text-zinc-400 max-w-[180px]"
-//           numberOfLines={1}
-//         >
-//           {product.brand}
-//         </Text>
-
-//         <View className="w-10 h-10 items-center justify-center rounded-full bg-zinc-50 border border-zinc-100">
-//           <Ionicons name="heart-outline" size={18} color="#18181b" />
-//         </View>
-//       </View>
-
-//       <ScrollView showsVerticalScrollIndicator={true} className="flex-1">
-//         {/* 2. THE MEDIA CAROUSEL FRAME */}
-//         <View
-//           className="bg-zinc-50"
-//           style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
-//         >
-//           <FlatList
-//             ref={mainListRef}
-//             data={sortedImages}
-//             keyExtractor={(item) => item.id}
-//             horizontal
-//             pagingEnabled
-//             showsHorizontalScrollIndicator={false}
-//             onMomentumScrollEnd={(e) => {
-//               const index = Math.round(
-//                 e.nativeEvent.contentOffset.x / SCREEN_WIDTH,
-//               );
-//               setActiveImageIndex(index);
-//             }}
-//             renderItem={({ item }) => (
-//               <Image
-//                 source={{ uri: item.imageUrl }}
-//                 style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
-//                 resizeMode="cover"
-//               />
-//             )}
-//           />
-//         </View>
-
-//         {/* 3. VISIBLE THUMBNAIL TRACK (SCROLLBAR & NAV ALTERNATIVE) */}
-//         {sortedImages.length > 1 && (
-//           <View className="border-b border-zinc-100 py-3 bg-white">
-//             <ScrollView
-//               horizontal
-//               showsHorizontalScrollIndicator={true}
-//               contentContainerStyle={{ paddingHorizontal: 24, gap: 10 }}
-//             >
-//               {sortedImages.map((img, idx) => {
-//                 const isCurrent = idx === activeImageIndex;
-//                 return (
-//                   <TouchableOpacity
-//                     key={img.id}
-//                     onPress={() => scrollToImage(idx)}
-//                     activeOpacity={0.8}
-//                     className={`w-16 h-16 rounded-xl overflow-hidden bg-zinc-100 border-2 transition-all ${
-//                       isCurrent
-//                         ? "border-zinc-950 scale-105"
-//                         : "border-transparent opacity-60"
-//                     }`}
-//                   >
-//                     <Image
-//                       source={{ uri: img.imageUrl }}
-//                       className="w-full h-full"
-//                       resizeMode="cover"
-//                     />
-//                   </TouchableOpacity>
-//                 );
-//               })}
-//             </ScrollView>
-//           </View>
-//         )}
-
-//         {/* 4. PRODUCT METRICS DECK */}
-//         <View className="mt-5 px-6">
-//           <View className="flex-row items-center gap-1.5">
-//             <Text className="text-[11px] font-black uppercase tracking-wider text-zinc-400">
-//               {product.category?.name || "Sneakers"}
-//             </Text>
-//           </View>
-
-//           <Text className="text-2xl font-black tracking-tight text-zinc-900 mt-1">
-//             {product.name}
-//           </Text>
-
-//           <View className="flex-row items-center justify-between mt-3 pb-5 border-b border-zinc-100">
-//             <View className="flex-row items-baseline gap-2.5">
-//               <Text className="text-2xl font-black text-zinc-950">
-//                 {formatPrice(product.salePrice)}
-//               </Text>
-//               {product.discountPercent > 0 && (
-//                 <Text className="text-sm font-medium text-zinc-400 line-through">
-//                   {formatPrice(product.basePrice).replace(" /-", "")}
-//                 </Text>
-//               )}
-//             </View>
-
-//             <View className="flex-row items-center gap-1 bg-zinc-50 border border-zinc-100 px-2.5 py-1 rounded-lg">
-//               <Ionicons name="star" size={13} color="#f59e0b" />
-//               <Text className="text-xs font-bold text-zinc-800">
-//                 {parsedRating.toFixed(1)}
-//               </Text>
-//               <Text className="text-[11px] font-medium text-zinc-400">
-//                 ({product.ratingCount})
-//               </Text>
-//             </View>
-//           </View>
-
-//           {/* 5. SIZE DECK WITH TOP-RIGHT CHART TRIGGER & STOCK LOCKS */}
-//           <View className="mt-6">
-//             <View className="flex-row items-center justify-between mb-4">
-//               <Text className="text-xs font-black uppercase tracking-wider text-zinc-900">
-//                 Select Size (US)
-//               </Text>
-
-//               <TouchableOpacity
-//                 onPress={() => setSizeChartVisible(true)}
-//                 activeOpacity={0.7}
-//                 className="flex-row items-center gap-1 bg-zinc-50 px-2.5 py-1.5 rounded-lg border border-zinc-100"
-//               >
-//                 <Ionicons name="list-outline" size={14} color="#2563eb" />
-//                 <Text className="text-xs font-bold text-blue-600 tracking-wide">
-//                   Size Guide
-//                 </Text>
-//               </TouchableOpacity>
-//             </View>
-
-//             {/* Sizes Buttons layout */}
-//             <View className="flex-row flex-wrap gap-2.5">
-//               {uniqueSizes.map((size) => {
-//                 const isSelected = selectedSize === size;
-//                 const matchingVariants =
-//                   product.variants?.filter((v) => v.size === size) || [];
-//                 const totalStockForSize = matchingVariants.reduce(
-//                   (acc, curr) => acc + curr.stock,
-//                   0,
-//                 );
-//                 const isOutOfStock = totalStockForSize <= 0;
-
-//                 return (
-//                   <TouchableOpacity
-//                     key={size}
-//                     disabled={isOutOfStock}
-//                     onPress={() => setSelectedSize(size)}
-//                     activeOpacity={isOutOfStock ? 1 : 0.7}
-//                     className={`h-14 min-w-[64px] items-center justify-center px-4 rounded-xl relative overflow-hidden transition-all ${
-//                       isSelected
-//                         ? "bg-zinc-950 border border-zinc-950 shadow-sm"
-//                         : isOutOfStock
-//                           ? "bg-zinc-50 border border-zinc-100"
-//                           : "bg-white border border-zinc-200"
-//                     }`}
-//                   >
-//                     <Text
-//                       className={`text-sm font-black ${
-//                         isSelected
-//                           ? "text-white"
-//                           : isOutOfStock
-//                             ? "text-zinc-300"
-//                             : "text-zinc-800"
-//                       }`}
-//                     >
-//                       {size}
-//                     </Text>
-
-//                     {/* Absolute Diagonal Lockout Line for Sold Out Sizes */}
-//                     {isOutOfStock && (
-//                       <View className="absolute w-[140%] h-[1.5px] bg-zinc-300 rotate-[35deg]" />
-//                     )}
-//                   </TouchableOpacity>
-//                 );
-//               })}
-//             </View>
-//           </View>
-
-//           {/* Description Block */}
-//           <View className="mt-8">
-//             <Text className="text-xs font-black uppercase tracking-wider text-zinc-900 mb-2">
-//               Product Overview
-//             </Text>
-//             <Text className="text-sm text-zinc-500 leading-6 tracking-wide font-normal">
-//               {product.description ||
-//                 "No dynamic overview details compiled for this shoe model variant asset yet."}
-//             </Text>
-//           </View>
-//         </View>
-//       </ScrollView>
-
-//       {/* FIXED BOTTOM ACTION PANEL */}
-//       <View className="bg-white border-t border-zinc-100 px-6 pt-3 pb-5 flex-row items-center gap-4 shadow-xl">
-//         <View className="flex-1">
-//           <Text className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-//             Total Price
-//           </Text>
-//           <Text className="text-xl font-black text-zinc-950 mt-0.5">
-//             {formatPrice(product.salePrice)}
-//           </Text>
-//         </View>
-
-//         <TouchableOpacity
-//           activeOpacity={0.8}
-//           className="flex-[2] h-14 bg-zinc-950 rounded-xl items-center justify-center"
-//         >
-//           <Text className="text-white font-bold text-sm uppercase tracking-wider">
-//             Add to Bag
-//           </Text>
-//         </TouchableOpacity>
-//       </View>
-
-//       <MeasurementChartModal
-//         isVisible={sizeChartVisible}
-//         onClose={() => setSizeChartVisible(false)}
-//       />
-//     </SafeAreaView>
-//   );
-// }
-
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   View,
@@ -369,6 +18,9 @@ import { formatPrice } from "@/utils/price.utils";
 import type { Product } from "@/types";
 import { ENV } from "@/config/env";
 import MeasurementChartModal from "@/components/products/MeasurementChartModal";
+import { useWishlistStore } from "@/store/wishlistStore";
+import { useAuth } from "@clerk/expo";
+import Toast from "react-native-toast-message";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BACKEND_URL = ENV.API_URL;
@@ -376,6 +28,9 @@ const BACKEND_URL = ENV.API_URL;
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { getToken } = useAuth();
+  const { isWishlisted, toggleWishlist } = useWishlistStore();
+
   const mainListRef = useRef<FlatList>(null);
 
   // Core Data & UI State Framework
@@ -384,7 +39,6 @@ export default function ProductDetailScreen() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [sizeChartVisible, setSizeChartVisible] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
 
   // Fetch individual product schema layout payload
   useEffect(() => {
@@ -519,6 +173,46 @@ export default function ProductDetailScreen() {
     }
   };
 
+  const handleWishlistToggle = async (item: Product) => {
+    try {
+      const token = await getToken();
+
+      if (!token) {
+        Toast.show({
+          type: "error",
+          text1: "Login required",
+          text2: "Please log in to use wishlist",
+        });
+        return;
+      }
+
+      await toggleWishlist(token, {
+        productId: item.id,
+        name: item.name,
+        brand: item.brand,
+        basePrice: Number(item.basePrice),
+        salePrice: Number(item.salePrice),
+        discountPercent: item.discountPercent,
+        averageRating: Number(item.averageRating),
+        baseImageUrl: item.images?.[0]?.imageUrl || "",
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Wishlist updated",
+        text2: "Your changes were saved",
+      });
+    } catch (error) {
+      console.error("Wishlist toggle error:", error);
+
+      Toast.show({
+        type: "error",
+        text1: "Something went wrong",
+        text2: "Please try again later",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <View className="flex-1 bg-zinc-50 items-center justify-center">
@@ -568,14 +262,14 @@ export default function ProductDetailScreen() {
         </Text>
 
         <TouchableOpacity
-          onPress={() => setIsWishlisted(!isWishlisted)}
+          onPress={() => handleWishlistToggle(product)}
           className="w-9 h-9 items-center justify-center rounded-full bg-zinc-50 border border-zinc-100/80"
           activeOpacity={0.7}
         >
           <Ionicons
-            name={isWishlisted ? "heart" : "heart-outline"}
+            name={isWishlisted(product.id) ? "heart" : "heart-outline"}
             size={18}
-            color={isWishlisted ? "#ef4444" : "#18181b"}
+            color={isWishlisted(product.id) ? "#ef4444" : "#18181b"}
           />
         </TouchableOpacity>
       </View>

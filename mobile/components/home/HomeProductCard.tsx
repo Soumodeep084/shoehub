@@ -15,10 +15,10 @@ type ProductCardProps = {
   rating: number;
   isWishlisted?: boolean;
   onPress?: () => void;
-  onWishlistPress?: () => void;
+  onWishlistToggle?: () => void;
 };
 
-export function ProductCard({
+export const HomeProductCard = ({
   image,
   brand,
   categoryId,
@@ -29,8 +29,8 @@ export function ProductCard({
   rating,
   isWishlisted,
   onPress,
-  onWishlistPress,
-}: ProductCardProps) {
+  onWishlistToggle,
+}: ProductCardProps) => {
   const scale = useRef(new Animated.Value(1)).current;
 
   const animateTo = (toValue: number) => {
@@ -71,7 +71,7 @@ export function ProductCard({
           )}
 
           <TouchableOpacity
-            onPress={onWishlistPress}
+            onPress={onWishlistToggle}
             hitSlop={12}
             className="absolute right-4 top-4 h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-sm"
             activeOpacity={0.8}
@@ -97,7 +97,7 @@ export function ProductCard({
             {name}
           </Text>
 
-          <View className="flex-row items-baseline gap-2">
+          <View className="flex-row items-baseline gap-1">
             <Text className="text-lg font-black text-zinc-950">
               {formatPrice(salePrice)}
             </Text>
@@ -109,14 +109,14 @@ export function ProductCard({
             )}
           </View>
 
-          <View className="flex-row items-center gap-1 px-2">
+          <View className="flex-row items-center gap-1 px-1">
             <Ionicons name="star" size={13} color="#f59e0b" />
             <Text className="text-xs font-semibold text-zinc-500">
-              {rating.toFixed(1)} {"   "}
+              {rating.toFixed(1)}
             </Text>
           </View>
         </View>
       </Animated.View>
     </TouchableOpacity>
   );
-}
+};

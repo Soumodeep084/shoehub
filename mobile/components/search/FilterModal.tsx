@@ -13,13 +13,13 @@ import { useFilterStore, SortByType } from "@/store/filterStore";
 import { Ionicons } from "@expo/vector-icons";
 import { SIZES, PRICE_PRESETS, SORT_BY } from "@/constants/filter.data";
 
-export function FilterModal({
+export const FilterModal = ({
   isVisible,
   onClose,
 }: {
   isVisible: boolean;
   onClose: () => void;
-}) {
+}) => {
   const categories = useCategoryStore((state) => state.categories);
   const brands = useBrandStore((state) => state.brands);
 
@@ -329,4 +329,4 @@ export function FilterModal({
       </View>
     </Modal>
   );
-}
+};

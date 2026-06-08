@@ -6,7 +6,7 @@ type SectionRevealProps = {
   delay?: number;
 };
 
-export function SectionReveal({ children, delay = 0 }: SectionRevealProps) {
+export const SectionReveal = ({ children, delay = 0 }: SectionRevealProps) => {
   const opacity = useRef(new Animated.Value(0)).current;
 
   const translateY = useRef(new Animated.Value(14)).current;
@@ -39,4 +39,4 @@ export function SectionReveal({ children, delay = 0 }: SectionRevealProps) {
       {children}
     </Animated.View>
   );
-}
+};

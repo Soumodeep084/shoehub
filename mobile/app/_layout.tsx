@@ -7,6 +7,7 @@ import {
   configureReanimatedLogger,
   ReanimatedLogLevel,
 } from "react-native-reanimated";
+import Toast from "react-native-toast-message";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -26,6 +27,7 @@ export default function RootLayout() {
       {/* Sync Clerk metadata into zustand early */}
       <ClerkUserSync />
       <Slot />
+      <Toast />
     </ClerkProvider>
   );
 }

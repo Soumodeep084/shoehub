@@ -17,6 +17,9 @@ import { searchPriceLabels } from "@/utils/price.utils"; // Swapped to match car
 import type { Product } from "@/types";
 import { ENV } from "@/config/env";
 import SearchProductCard from "@/components/search/SearchProductCard";
+import { useAuth } from "@clerk/expo";
+import { useWishlistStore } from "@/store/wishlistStore";
+import Toast from "react-native-toast-message";
 
 const BACKEND_URL = ENV.API_URL;
 
@@ -83,6 +86,9 @@ const Search = () => {
   const categories = useCategoryStore((state) => state.categories);
   const category = categories.find((c) => c.id === categoryId);
 
+  const { getToken } = useAuth();
+  const { isWishlisted, toggleWishlist } = useWishlistStore();
+
   // --- 1. ONE-TIME INITIAL SEEDING FROM HOME SCREEN ---
   useEffect(() => {
     if (isInitialSyncDone.current) return;
@@ -99,7 +105,15 @@ const Search = () => {
     }
 
     isInitialSyncDone.current = true;
-  }, [params]);
+  }, [
+    params.category,
+    params.brand,
+    params.sort,
+    params.openFilters,
+    setCategoryId,
+    setBrand,
+    setSortBy,
+  ]);
 
   // --- 2. DEBOUNCE KEYSTROKES FROM SEARCH BAR ---
   useEffect(() => {
@@ -111,13 +125,17 @@ const Search = () => {
 
   // --- 3. DYNAMIC BACKEND API FETCH ENGINE ---
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchFilteredProducts = async () => {
       setIsLoading(true);
+
       try {
         let url = `${BACKEND_URL}/api/products?`;
 
-        if (debouncedSearch)
+        if (debouncedSearch) {
           url += `search=${encodeURIComponent(debouncedSearch)}&`;
+        }
 
         if (categoryId && categoryId !== "All" && categoryId !== "all") {
           url += `categoryId=${categoryId}&`;
@@ -127,30 +145,61 @@ const Search = () => {
           url += `brand=${encodeURIComponent(brand)}&`;
         }
 
-        if (minPrice !== null) url += `minPrice=${minPrice}&`;
-        if (maxPrice !== null) url += `maxPrice=${maxPrice}&`;
+        if (minPrice !== null) {
+          url += `minPrice=${minPrice}&`;
+        }
 
-        if (size && size !== "Any") url += `size=${encodeURIComponent(size)}&`;
+        if (maxPrice !== null) {
+          url += `maxPrice=${maxPrice}&`;
+        }
 
-        if (sortBy === "newest") url += "new=true&";
-        else if (sortBy === "trending") url += "trending=true&";
-        else if (sortBy === "featured") url += "featured=true&";
-        else if (sortBy === "priceLowToHigh") url += "sort=price_asc&";
-        else if (sortBy === "priceHighToLow") url += "sort=price_desc&";
+        if (size && size !== "Any") {
+          url += `size=${encodeURIComponent(size)}&`;
+        }
 
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
+        if (sortBy === "newest") {
+          url += "new=true&";
+        } else if (sortBy === "trending") {
+          url += "trending=true&";
+        } else if (sortBy === "featured") {
+          url += "featured=true&";
+        } else if (sortBy === "priceLowToHigh") {
+          url += "sort=price_asc&";
+        } else if (sortBy === "priceHighToLow") {
+          url += "sort=price_desc&";
+        }
+
+        const res = await fetch(url, {
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Request failed: ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        // Only update state if request wasn't aborted
+        if (!controller.signal.aborted) {
           setProducts(data);
         }
       } catch (err) {
-        console.error("Fetch products error:", err);
+        if (err instanceof Error && err.name !== "AbortError") {
+          console.error("Fetch products error:", err);
+        }
       } finally {
-        setIsLoading(false);
+        // Prevent state updates from aborted requests
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchFilteredProducts();
+
+    return () => {
+      controller.abort();
+    };
   }, [debouncedSearch, categoryId, brand, minPrice, maxPrice, sortBy, size]);
 
   const activeFilterCount = [
@@ -171,6 +220,47 @@ const Search = () => {
     }
     return "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519";
   }, []);
+
+  const handleWishlistToggle = async (item: Product) => {
+    try {
+      const token = await getToken();
+
+      if (!token) {
+        Toast.show({
+          type: "error",
+          text1: "Login required",
+          text2: "Please log in to use wishlist",
+        });
+        return;
+      }
+
+      await toggleWishlist(token, {
+        productId: item.id,
+        categoryId: item.categoryId,
+        name: item.name,
+        brand: item.brand,
+        basePrice: Number(item.basePrice),
+        salePrice: Number(item.salePrice),
+        discountPercent: item.discountPercent,
+        averageRating: Number(item.averageRating),
+        baseImageUrl: getProductImageUrl(item),
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Wishlist updated",
+        text2: "Your changes were saved",
+      });
+    } catch (error) {
+      console.error("Wishlist error:", error);
+
+      Toast.show({
+        type: "error",
+        text1: "Something went wrong",
+        text2: "Please try again later",
+      });
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-zinc-50">
@@ -264,7 +354,6 @@ const Search = () => {
 
       {/* Grid Shelf Output */}
       <View className="flex-1 px-3.5">
-        <Text> </Text>
         {/* Re-balanced gutter sizing for 2-column clean mapping */}
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
@@ -280,11 +369,11 @@ const Search = () => {
               <SearchProductCard
                 item={item}
                 getProductImageUrl={getProductImageUrl}
-                onWishlistPress={() => {}}
-                isWishlisted={false}
+                onWishlistPress={() => handleWishlistToggle(item)}
+                isWishlisted={isWishlisted(item.id)}
               />
             )}
-            contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 5 }} 
+            contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 5 }}
             ListEmptyComponent={
               <View className="flex-1 items-center justify-center pt-24">
                 <Text className="text-zinc-400 font-medium text-base mt-4 text-center">
