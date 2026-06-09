@@ -19,6 +19,7 @@ import type { Product } from "@/types";
 import { ENV } from "@/config/env";
 import MeasurementChartModal from "@/components/products/MeasurementChartModal";
 import { useWishlistStore } from "@/store/wishlistStore";
+import { useCartStore } from "@/store/cartStore";
 import { useAuth } from "@clerk/expo";
 import Toast from "react-native-toast-message";
 
@@ -30,6 +31,7 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const { getToken } = useAuth();
   const { isWishlisted, toggleWishlist } = useWishlistStore();
+  const { addToCart, isInCart } = useCartStore();
 
   const mainListRef = useRef<FlatList>(null);
 
@@ -38,6 +40,7 @@ export default function ProductDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [sizeChartVisible, setSizeChartVisible] = useState(false);
 
   // Fetch individual product schema layout payload
@@ -52,8 +55,13 @@ export default function ProductDetailScreen() {
           setProduct(data);
 
           if (data.variants && data.variants.length > 0) {
-            const firstInStock = data.variants.find((v: any) => v.stock > 0);
-            if (firstInStock) setSelectedSize(firstInStock.size);
+            const firstInStock = data.variants.find(
+              (v: { stock: number }) => v.stock > 0,
+            );
+            if (firstInStock) {
+              setSelectedSize(firstInStock.size);
+              setSelectedColor(firstInStock.color);
+            }
           }
         }
       } catch (error) {
@@ -93,16 +101,28 @@ export default function ProductDetailScreen() {
     );
   }, [product]);
 
+  // Dynamic Color Allocator
+  const availableColors = useMemo(() => {
+    if (!selectedSize || !product?.variants) {
+      return [];
+    }
+
+    return Array.from(
+      new Set(
+        product.variants
+          .filter((v) => v.size === selectedSize)
+          .map((v) => v.color),
+      ),
+    );
+  }, [selectedSize, product]);
+
   // Real-time Stock Status Monitor
   const currentStockStatus = useMemo(() => {
     if (!selectedSize || !product?.variants) return null;
-    const relevantVariants = product.variants.filter(
-      (v) => v.size === selectedSize,
+    const variant = product.variants.find(
+      (v) => v.size === selectedSize && v.color === selectedColor,
     );
-    const totalStock = relevantVariants.reduce(
-      (acc, curr) => acc + curr.stock,
-      0,
-    );
+    const totalStock = variant?.stock ?? 0;
 
     if (totalStock <= 0)
       return {
@@ -118,7 +138,22 @@ export default function ProductDetailScreen() {
       label: "In Stock",
       style: "text-emerald-400 bg-emerald-50 border-emerald-100",
     };
-  }, [selectedSize, product]);
+  }, [selectedSize, selectedColor, product]);
+
+  const selectedVariant = useMemo(() => {
+    if (!selectedSize || !selectedColor || !product?.variants) {
+      return null;
+    }
+
+    return (
+      product.variants.find(
+        (variant) =>
+          variant.size === selectedSize && variant.color === selectedColor,
+      ) || null
+    );
+  }, [selectedSize, selectedColor, product]);
+
+  const alreadyInCart = selectedVariant ? isInCart(selectedVariant.id) : false;
 
   // Extensible Product Metadata Fallback Blocks
   const highlights = useMemo(() => {
@@ -188,6 +223,7 @@ export default function ProductDetailScreen() {
 
       await toggleWishlist(token, {
         productId: item.id,
+        categoryId: item.categoryId,
         name: item.name,
         brand: item.brand,
         basePrice: Number(item.basePrice),
@@ -209,6 +245,62 @@ export default function ProductDetailScreen() {
         type: "error",
         text1: "Something went wrong",
         text2: "Please try again later",
+      });
+    }
+  };
+
+  const handleAddToCart = async (product: Product, alreadyInCart: boolean) => {
+    try {
+      if (!selectedVariant) {
+        Toast.show({
+          type: "error",
+          text1: "Select a variant",
+          text2: "Please choose size and color",
+        });
+
+        return;
+      }
+
+      const token = await getToken();
+
+      if (!token) {
+        Toast.show({
+          type: "error",
+          text1: "Login required",
+          text2: "Please log in to use cart",
+        });
+        return;
+      }
+
+      await addToCart(token, {
+        productId: product.id,
+        variantId: selectedVariant.id,
+
+        name: product.name,
+        brand: product.brand,
+
+        salePrice: Number(product.salePrice),
+        basePrice: Number(product.basePrice),
+
+        imageUrl: sortedImages[0]?.imageUrl || "",
+        size: selectedVariant.size,
+        color: selectedVariant.color,
+
+        quantity: 1,
+      });
+
+      Toast.show({
+        type: "success",
+        text1: `${alreadyInCart ? "Updated" : "Added"} to cart`,
+        text2: `${product.name} ${alreadyInCart ? "updated" : "added"} successfully`,
+      });
+    } catch (error) {
+      console.error(error);
+
+      Toast.show({
+        type: "error",
+        text1: "Failed",
+        text2: "Could not add item to cart",
       });
     }
   };
@@ -439,7 +531,15 @@ export default function ProductDetailScreen() {
                   <TouchableOpacity
                     key={size}
                     disabled={isOutOfStock}
-                    onPress={() => setSelectedSize(size)}
+                    onPress={() => {
+                      setSelectedSize(size);
+
+                      const firstAvailableVariant = product.variants?.find(
+                        (v) => v.size === size && v.stock > 0,
+                      );
+
+                      setSelectedColor(firstAvailableVariant?.color ?? null);
+                    }}
                     activeOpacity={isOutOfStock ? 1 : 0.5}
                     className={`h-12 min-w-[56px] px-5 items-center justify-center rounded-xl relative overflow-hidden ${
                       isSelected
@@ -467,6 +567,54 @@ export default function ProductDetailScreen() {
                   </TouchableOpacity>
                 );
               })}
+            </View>
+
+            <View className="mt-6">
+              <Text className="text-xs font-black uppercase tracking-wider text-zinc-900 mb-4">
+                Select Color
+              </Text>
+
+              <View className="flex-row flex-wrap gap-3">
+                {availableColors.map((color) => {
+                  const isSelected = selectedColor === color;
+
+                  const colorStock =
+                    product.variants
+                      ?.filter(
+                        (v) => v.size === selectedSize && v.color === color,
+                      )
+                      .reduce((acc, curr) => acc + curr.stock, 0) ?? 0;
+
+                  const isOutOfStock = colorStock <= 0;
+
+                  return (
+                    <TouchableOpacity
+                      key={color}
+                      disabled={isOutOfStock}
+                      onPress={() => setSelectedColor(color)}
+                      className={`px-4 py-3 rounded-xl border ${
+                        isSelected
+                          ? "bg-zinc-950 border-zinc-950"
+                          : isOutOfStock
+                            ? "bg-zinc-50 border-zinc-100"
+                            : "bg-white border-zinc-200"
+                      }`}
+                    >
+                      <Text
+                        className={`font-bold ${
+                          isSelected
+                            ? "text-white"
+                            : isOutOfStock
+                              ? "text-zinc-300"
+                              : "text-zinc-900"
+                        }`}
+                      >
+                        {color}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
             {/* Stock Metric Live Broadcast Strip */}
@@ -592,20 +740,30 @@ export default function ProductDetailScreen() {
       {/* 11. LUXURY STICKY FLOATING ATTACHMENT ACTION BAR */}
       <View className="bg-white border-t border-zinc-100 px-6 pt-4 pb-6 flex-row items-center gap-5 shadow-2xl shadow-black/20">
         <View className="flex-1">
-          <Text className="text-[10px] font-black text-zinc-400 uppercase tracking-[1.5px]">
+          <Text className="text-[10px] font-black text-zinc-800 uppercase tracking-[1.5px]">
             Total Price
           </Text>
           <Text className="text-2xl font-black text-zinc-950 mt-0.5 tracking-tight">
             {formatPrice(product.salePrice)}
           </Text>
+
+          <Text className="text-md font-black text-zinc-400 mt-0.5 tracking-tight line-through">
+            {formatPrice(product.basePrice)}
+          </Text>
         </View>
 
         <TouchableOpacity
           activeOpacity={0.8}
-          className="flex-[2] h-14 bg-zinc-950 rounded-xl items-center justify-center shadow-md active:bg-zinc-900"
+          onPress={() => handleAddToCart(product, alreadyInCart)}
+          disabled={!selectedVariant || selectedVariant.stock <= 0}
+          className={`flex-[2] h-14 rounded-xl items-center justify-center shadow-md ${
+            !selectedVariant || selectedVariant.stock <= 0
+              ? "bg-zinc-300"
+              : "bg-zinc-950"
+          }`}
         >
           <Text className="text-white font-black text-xs uppercase tracking-[1.5px]">
-            Add To Cart
+            {alreadyInCart ? "Add One More to Cart" : "Add To Cart"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -613,6 +771,7 @@ export default function ProductDetailScreen() {
       <MeasurementChartModal
         isVisible={sizeChartVisible}
         onClose={() => setSizeChartVisible(false)}
+        defaultTab="Men"
       />
     </SafeAreaView>
   );

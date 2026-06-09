@@ -1,10 +1,17 @@
 // import { useUserStore } from "@/store/userStore";
+import { useCartStore } from "@/store/cartStore";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
+import {
+  Icon,
+  Label,
+  NativeTabs,
+  Badge,
+} from "expo-router/unstable-native-tabs";
 import { Platform } from "react-native";
 
 function AndroidTabs() {
+  const cartItemsCount = useCartStore((state) => state.getCartCount());
   return (
     <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen
@@ -52,6 +59,8 @@ function AndroidTabs() {
         name="cart"
         options={{
           title: "Cart",
+          tabBarBadge: cartItemsCount > 0 ? cartItemsCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: "red", color: "white" , fontSize: 11, minWidth: 16, height: 16, fontWeight: "bold", paddingHorizontal: 4, lineHeight: 16},
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cart" color={color} size={size} />
           ),
@@ -72,6 +81,7 @@ function AndroidTabs() {
 }
 
 function IOSTabs() {
+  const cartItemsCount = useCartStore((state) => state.getCartCount());
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -97,6 +107,7 @@ function IOSTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="cart">
+        <Badge>{cartItemsCount > 0 ? String(cartItemsCount) : undefined}</Badge>
         <Icon sf="bag.fill" />
         <Label>Cart</Label>
       </NativeTabs.Trigger>
