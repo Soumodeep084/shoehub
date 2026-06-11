@@ -28,6 +28,12 @@ export default function SignIn() {
   const [resetLoading, setResetLoading] = useState(false);
   const [signInError, setSignInError] = useState("");
 
+  const [showEmailVerification, setShowEmailVerification] = useState(false);
+  const [emailVerificationProcess, setEmailVerificationProcess] =
+    useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationError, setVerificationError] = useState("");
+
   const onSignInPress = async () => {
     setSignInError(""); // Clears old errors when you try again
 
@@ -59,7 +65,16 @@ export default function SignIn() {
           },
         });
       } else if (signIn.status === "needs_second_factor") {
-        await signIn.mfa.sendPhoneCode();
+        const emailFactor = signIn.supportedSecondFactors.find(
+          (factor) => factor.strategy === "email_code",
+        );
+
+        if (emailFactor) {
+          await signIn.mfa.sendEmailCode();
+          setShowEmailVerification(true);
+          console.log("Email code sent");
+          console.log(signIn.mfa);
+        }
       } else if (signIn.status === "needs_client_trust") {
         const emailCodeFactor = signIn.supportedSecondFactors.find(
           (factor) => factor.strategy === "email_code",
@@ -67,6 +82,8 @@ export default function SignIn() {
 
         if (emailCodeFactor) {
           await signIn.mfa.sendEmailCode();
+          setShowEmailVerification(true);
+          console.log("Email code sent");
         }
       } else {
         console.error("Sign-In attempt not complete : \n", signIn);
@@ -201,6 +218,83 @@ export default function SignIn() {
   };
 
   const isLoading = fetchStatus === "fetching";
+  const verifyEmailCode = async () => {
+    try {
+      setEmailVerificationProcess(true);
+      setVerificationError("");
+
+      const { error } = await signIn.mfa.verifyEmailCode({
+        code: verificationCode.trim(),
+      });
+
+      if (error) {
+        setVerificationError(error.message);
+        return;
+      }
+
+      if (signIn.status === "complete") {
+        setEmailVerificationProcess(false);
+        await signIn.finalize({
+          navigate: ({ session, decorateUrl }) => {
+            if (session?.currentTask) {
+              console.log(session.currentTask);
+              return;
+            }
+
+            const url = decorateUrl("/");
+            router.replace(url as any);
+          },
+        });
+      }
+    } catch (err: any) {
+      console.log(err);
+
+      setVerificationError(
+        err?.errors?.[0]?.longMessage ||
+          err?.errors?.[0]?.message ||
+          "Invalid verification code",
+      );
+    }
+  };
+  if (showEmailVerification) {
+    return (
+      <View className="flex-1 justify-center px-6 bg-stone-50">
+        <Image
+          source={require("../../assets/images/shoehub.png")}
+          className="w-36 h-16 mb-8"
+          resizeMode="contain"
+        />
+        <Text className="text-3xl font-bold mb-2">Verify Email</Text>
+
+        <Text className="text-gray-500 mb-6">
+          Enter the code sent to your email
+        </Text>
+
+        <TextInput
+          value={verificationCode}
+          onChangeText={setVerificationCode}
+          placeholder="Verification code"
+          keyboardType="number-pad"
+          className="w-full border border-gray-300 rounded-xl px-4 py-3 mb-4 bg-white"
+        />
+
+        {verificationError ? (
+          <Text className="text-red-500 mb-4">{verificationError}</Text>
+        ) : null}
+
+        <TouchableOpacity
+          onPress={verifyEmailCode}
+          className="bg-black py-4 rounded-xl items-center"
+        >
+          {emailVerificationProcess ? (
+            <Text className="text-white font-bold">Verify</Text>
+          ) : (
+            <ActivityIndicator color="white" />
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (mode === "reset") {
     return (

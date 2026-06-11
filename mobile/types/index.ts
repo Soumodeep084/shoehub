@@ -71,3 +71,38 @@ export interface Product {
 	images?: ProductImage[];
 	variants?: ProductVariant[];
 }
+
+
+export interface Address {
+	id: string;
+	userId: string;
+	label: string;
+	fullName: string;
+	phone: string;
+	line1: string;
+	line2: string | null;
+	city: string;
+	state: string;
+	postalCode: string;
+	country: string;
+	landmark: string | null;
+	isDefault: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface AddressInput {
+	label: string;
+	fullName: string;
+	phone: string;
+	line1: string;
+	line2?: string;
+	city: string;
+	state: string;
+	postalCode: string;
+	country?: string;
+	landmark?: string;
+	isDefault?: boolean;
+}
+
+
