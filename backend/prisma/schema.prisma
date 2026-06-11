@@ -23,18 +23,42 @@ model User {
   lastName  String
   email     String   @unique
   imageUrl  String?
-  phone     String?  @unique
   role      Role     @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   wishlists Wishlist[]
   carts     Cart[]
+  addresses Address[]
 
   @@index([clerkId])
   @@index([email])
   @@index([id])
   @@map("users")
+}
+
+model Address {
+  id         String   @id @default(uuid())
+  userId     String
+  label      String
+  fullName   String
+  phone      String
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String   @default("India")
+  landmark   String?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isDefault])
+  @@map("addresses")
 }
 
 model Category {
