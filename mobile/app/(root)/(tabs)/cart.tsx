@@ -203,6 +203,29 @@ export default function Cart() {
 
   const finalTotal = cartTotal + shippingFee;
 
+  const handleCheckout = () => {
+    if (items.length === 0) {
+      Toast.show({
+        type: "error",
+        text1: "Empty Cart",
+        text2:
+          "Your cart is empty. Please add items before proceeding to checkout.",
+      });
+      return;
+    }
+    Alert.alert(
+      "Proceed to Checkout",
+      "You will be redirected to the checkout page to complete your order.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: () => router.push("/checkout"),
+        },
+      ],
+    );
+  };
+
   if (isLoading && !refreshing && items.length === 0) {
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center">
@@ -214,6 +237,14 @@ export default function Cart() {
   if (items.length === 0) {
     return (
       <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+        <View className="px-6 py-5 bg-white border-b border-zinc-100">
+          <Text className="text-3xl font-black  text-zinc-950">
+            Your Shopping Cart
+          </Text>
+          <Text className="text-zinc-400 mt-0.5 font-semibold text-xs uppercase">
+            No items in cart
+          </Text>
+        </View>
         <View className="flex-1 items-center justify-center px-6">
           <View className="relative mb-8 items-center justify-center">
             <View className="absolute h-32 w-32 rounded-full bg-zinc-50/50 scale-105 border border-zinc-50" />
@@ -222,16 +253,16 @@ export default function Cart() {
             </View>
           </View>
 
-          <Text className="text-2xl font-black tracking-tight text-zinc-900 text-center mb-3">
+          <Text className="text-2xl font-black  text-zinc-900 text-center mb-3">
             Your Cart Is Empty
           </Text>
           <Text className="text-[14px] text-zinc-400 text-center leading-6 max-w-[260px] font-medium mb-10">
-            Looks like you haven't curated any items into your shopping cart
-            yet.
+            Looks like you haven&apos;t curated any items into your shopping
+            cart yet.
           </Text>
 
           <TouchableOpacity
-            onPress={() => router.push("/explore" as any)}
+            onPress={() => router.push("/")}
             activeOpacity={0.8}
             className="w-full max-w-[220px] bg-zinc-950 h-14 rounded-2xl shadow-lg shadow-zinc-950/20 flex-row items-center justify-center gap-2"
           >
@@ -254,7 +285,7 @@ export default function Cart() {
     <SafeAreaView className="flex-1 bg-zinc-50" edges={["top"]}>
       {/* HEADER */}
       <View className="px-6 py-5 bg-white border-b border-zinc-100">
-        <Text className="text-3xl font-black tracking-tight text-zinc-950">
+        <Text className="text-3xl font-black  text-zinc-950">
           Your Shopping Cart
         </Text>
         <Text className="text-zinc-400 mt-0.5 font-semibold text-xs uppercase tracking-wider">
@@ -285,7 +316,12 @@ export default function Cart() {
           return (
             <View className="bg-white rounded-[24px] border border-zinc-100/80 shadow-2xl shadow-black/5 overflow-hidden mb-4">
               <TouchableOpacity
-                onPress={() => router.push(`/product/${item.productId}` as any)}
+                onPress={() =>
+                  router.push({
+                    pathname: "/product/[id]",
+                    params: { id: item.productId, from: "cart" },
+                  })
+                }
                 activeOpacity={0.7}
                 disabled={isItemLoading}
                 className={`flex-row p-4 ${isItemLoading ? "opacity-60" : ""}`}
@@ -305,7 +341,7 @@ export default function Cart() {
                       {item.brand}
                     </Text>
                     <Text
-                      className="text-base font-bold tracking-tight text-zinc-900 mt-0.5"
+                      className="text-base font-bold  text-zinc-900 mt-0.5"
                       numberOfLines={1}
                     >
                       {item.name}
@@ -530,7 +566,7 @@ export default function Cart() {
                     Grand Total
                   </Text>
 
-                  <Text className="text-2xl font-black tracking-tight text-zinc-950">
+                  <Text className="text-2xl font-black  text-zinc-950">
                     {formatPrice(finalTotal)}
                   </Text>
                 </View>
@@ -587,6 +623,7 @@ export default function Cart() {
 
         <TouchableOpacity
           activeOpacity={0.85}
+          onPress={handleCheckout}
           className="h-14 rounded-2xl bg-zinc-950 items-center justify-center"
         >
           <Text className="text-white font-black tracking-widest text-xs uppercase">

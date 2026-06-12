@@ -111,7 +111,7 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
                 throw new Error(`Wishlist sync failed (${response.status})`);
             }
         } catch (error) {
-            console.error("Wishlist sync failed. Rolling back...", error);
+            console.error("Toggle Wishlist sync failed. Rolling back...", error);
             // Rollback UI State if the backend server throws an error
             set({ items: previousItems });
         }

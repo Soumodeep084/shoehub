@@ -1,5 +1,16 @@
 export type Role = "USER" | "ADMIN";
 
+export type OrderStatus =
+	| "PENDING"
+	| "CONFIRMED"
+	| "PROCESSING"
+	| "SHIPPED"
+	| "DELIVERED"
+	| "CANCELLED"
+	| "REFUNDED";
+
+export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+
 export interface User {
 	id: string;
 	clerkId: string;
@@ -105,4 +116,71 @@ export interface AddressInput {
 	isDefault?: boolean;
 }
 
+export interface OrderItem {
+	id: string;
+	orderId: string;
+	productId: string;
+	variantId: string;
+	productName: string;
+	productBrand: string;
+	productImageUrl: string;
+	size: string;
+	color: string;
+	quantity: number;
+	unitPrice: string;
+	totalPrice: string;
+	createdAt: string;
+}
+
+export interface Order {
+	id: string;
+	userId: string;
+	orderNumber: string;
+	status: OrderStatus;
+	paymentStatus: PaymentStatus;
+	currency: string;
+	subtotal: string;
+	shippingFee: string;
+	discountAmount: string;
+	totalAmount: string;
+	shippingName: string;
+	shippingPhone: string;
+	shippingLine1: string;
+	shippingLine2: string | null;
+	shippingCity: string;
+	shippingState: string;
+	shippingPostalCode: string;
+	shippingCountry: string;
+	shippingLandmark: string | null;
+	createdAt: string;
+	updatedAt: string;
+	items: OrderItem[];
+	itemCount?: number;
+}
+
+export interface ProfileStats {
+	addressCount: number;
+	orderCount: number;
+}
+
+export interface ProfileResponse {
+	user: User;
+	stats: ProfileStats;
+	defaultAddress: Address | null;
+}
+
+export type SessionItem = {
+	id: string;
+	status: string;
+	lastActiveAt: Date;
+
+	latestActivity?: {
+		browserName?: string;
+		deviceType?: string;
+		city?: string;
+		country?: string;
+	};
+
+	revoke: () => Promise<any>;
+}
 

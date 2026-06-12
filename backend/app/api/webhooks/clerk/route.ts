@@ -55,6 +55,17 @@ export async function POST(req: Request) {
       });
     }
 
+    if (evt.type === "user.updated") {
+      await prisma.user.update({
+        where: { clerkId: evt.data.id },
+        data: {
+          firstName: evt.data.first_name || "",
+          lastName: evt.data.last_name || "",
+          imageUrl: evt.data.image_url || null,
+        },
+      });
+    }
+
     return new Response("OK", { status: 200 });
   } catch (err) {
     console.error("Webhook failed:", err);
