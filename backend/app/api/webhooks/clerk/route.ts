@@ -2,11 +2,8 @@ import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { WebhookEvent } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { createClerkClient } from "@clerk/backend";
+import { clerkClient } from "@/lib/clerkClient";
 
-const clerkClient = createClerkClient({
-  secretKey: process.env.CLERK_SECRET_KEY!,
-});
 
 export async function POST(req: Request) {
   try {

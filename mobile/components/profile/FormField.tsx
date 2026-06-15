@@ -21,7 +21,7 @@ export const FormField = ({
   autoCapitalize?: any;
 }) => (
   <View className="mb-5">
-    <Text className="mb-2 text-[11px] font-black uppercase tracking-[2px] text-zinc-500">
+    <Text className="mb-2 text-[11px] font-black uppercase tracking-[1px] text-zinc-500 select-none">
       {label}
 
       {required && <Text className="text-red-500"> *</Text>}

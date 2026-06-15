@@ -2,9 +2,10 @@ import { useAuth } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
+
 import {
-  Alert,
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   Text,
@@ -13,9 +14,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
-import { EmptyState } from "@/components/profile/EmptyState";
-import { useAddressStore } from "@/store/addressStore";
+
 import AddressRender from "@/components/profile/address/AddressRender";
+import { EmptyState } from "@/components/profile/EmptyState";
+
+import { useAddressStore } from "@/store/addressStore";
 
 export default function AddressesScreen() {
   const router = useRouter();
@@ -34,7 +37,7 @@ export default function AddressesScreen() {
     const token = await getToken();
     if (!token) return;
     await fetchAddresses(token);
-  }, [fetchAddresses , getToken]);
+  }, [fetchAddresses, getToken]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -125,7 +128,7 @@ export default function AddressesScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={() => router.push("/address-form")}
+          onPress={() => router.push("/address/address-form")}
           activeOpacity={0.85}
           className="h-11 w-11 items-center justify-center rounded-full bg-zinc-950"
         >
@@ -145,7 +148,7 @@ export default function AddressesScreen() {
           description="Add a delivery address to speed up checkout and keep your orders organized."
           icon="location-outline"
           actionLabel="Add Address"
-          onActionPress={() => router.push("/address-form")}
+          onActionPress={() => router.push("/address/address-form")}
         />
       ) : (
         <FlatList
