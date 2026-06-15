@@ -15,7 +15,12 @@ export const WishlistProductCard = ({
 }) => {
   return (
     <TouchableOpacity
-      onPress={() => router.push(`/product/${item.productId}` as any)}
+      onPress={() =>
+        router.push({
+          pathname: "/product/[id]",
+          params: { id: item.productId, from: "wishlist" },
+        })
+      }
       activeOpacity={0.9}
       className="flex-1 bg-transparent p-1.5 m-1"
     >
@@ -51,7 +56,7 @@ export const WishlistProductCard = ({
           className="text-sm font-semibold tracking-tight text-zinc-900"
           numberOfLines={1}
         >
-          {item.name} 
+          {item.name}
         </Text>
 
         <View className="mt-1 mx-1">

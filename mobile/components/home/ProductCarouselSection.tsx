@@ -128,7 +128,12 @@ export const ProductCarouselSection = ({
               originalPrice={item.basePrice}
               discountPercent={item.discountPercent}
               rating={parseFloat(item.averageRating)}
-              onPress={() => router.push(`/product/${item.id}`)}
+              onPress={() =>
+                router.push({
+                  pathname: `/product/[id]`,
+                  params: { id: item.id, from: "home" },
+                })
+              }
               isWishlisted={isWishlisted(item.id)}
               onWishlistToggle={() => handleWishlistToggle(item)}
             />

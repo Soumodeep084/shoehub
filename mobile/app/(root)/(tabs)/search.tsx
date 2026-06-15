@@ -6,7 +6,13 @@ import {
   FlatList,
   ActivityIndicator,
 } from "react-native";
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { FilterModal } from "@/components/search/FilterModal";
@@ -84,7 +90,18 @@ const Search = () => {
   } = useFilterStore();
 
   const categories = useCategoryStore((state) => state.categories);
-  const category = categories.find((c) => c.id === categoryId);
+  const categoryMap = useMemo(
+    () =>
+      Object.fromEntries(
+        categories.map((category) => [category.id, category.name]),
+      ),
+    [categories],
+  );
+
+  const category = useMemo(
+    () => categories.find((c) => c.id === categoryId),
+    [categories, categoryId],
+  );
 
   const { getToken } = useAuth();
   const { isWishlisted, toggleWishlist } = useWishlistStore();
@@ -221,46 +238,62 @@ const Search = () => {
     return "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519";
   }, []);
 
-  const handleWishlistToggle = async (item: Product) => {
-    try {
-      const token = await getToken();
+  const handleWishlistToggle = useCallback(
+    async (item: Product) => {
+      try {
+        const token = await getToken();
 
-      if (!token) {
+        if (!token) {
+          Toast.show({
+            type: "error",
+            text1: "Login required",
+            text2: "Please log in to use wishlist",
+          });
+          return;
+        }
+
+        await toggleWishlist(token, {
+          productId: item.id,
+          categoryId: item.categoryId,
+          name: item.name,
+          brand: item.brand,
+          basePrice: Number(item.basePrice),
+          salePrice: Number(item.salePrice),
+          discountPercent: item.discountPercent,
+          averageRating: Number(item.averageRating),
+          baseImageUrl: getProductImageUrl(item),
+        });
+
+        Toast.show({
+          type: "success",
+          text1: "Wishlist updated",
+          text2: "Your changes were saved",
+        });
+      } catch (error) {
+        console.error("Wishlist error:", error);
+
         Toast.show({
           type: "error",
-          text1: "Login required",
-          text2: "Please log in to use wishlist",
+          text1: "Something went wrong",
+          text2: "Please try again later",
         });
-        return;
       }
+    },
+    [getToken, toggleWishlist, getProductImageUrl],
+  );
 
-      await toggleWishlist(token, {
-        productId: item.id,
-        categoryId: item.categoryId,
-        name: item.name,
-        brand: item.brand,
-        basePrice: Number(item.basePrice),
-        salePrice: Number(item.salePrice),
-        discountPercent: item.discountPercent,
-        averageRating: Number(item.averageRating),
-        baseImageUrl: getProductImageUrl(item),
-      });
-
-      Toast.show({
-        type: "success",
-        text1: "Wishlist updated",
-        text2: "Your changes were saved",
-      });
-    } catch (error) {
-      console.error("Wishlist error:", error);
-
-      Toast.show({
-        type: "error",
-        text1: "Something went wrong",
-        text2: "Please try again later",
-      });
-    }
-  };
+  const renderItem = useCallback(
+    ({ item }: { item: Product }) => (
+      <SearchProductCard
+        item={item}
+        categoryName={categoryMap[item.categoryId] ?? "Sneakers"}
+        getProductImageUrl={getProductImageUrl}
+        onWishlistPress={handleWishlistToggle}
+        isWishlisted={isWishlisted(item.id)}
+      />
+    ),
+    [getProductImageUrl, isWishlisted, handleWishlistToggle , categoryMap],
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-zinc-50">
@@ -365,14 +398,7 @@ const Search = () => {
             keyExtractor={(item) => item.id}
             numColumns={2}
             showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <SearchProductCard
-                item={item}
-                getProductImageUrl={getProductImageUrl}
-                onWishlistPress={() => handleWishlistToggle(item)}
-                isWishlisted={isWishlisted(item.id)}
-              />
-            )}
+            renderItem={renderItem}
             contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 5 }}
             ListEmptyComponent={
               <View className="flex-1 items-center justify-center pt-24">

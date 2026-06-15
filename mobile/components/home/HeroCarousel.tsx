@@ -89,7 +89,10 @@ export const  HeroCarousel = ({ slides }: HeroCarouselProps) => {
               style={{ width: itemWidth }}
             >
               <TouchableOpacity
-                onPress={() => router.push(`/product/${item.product.id}`)}
+                onPress={() => router.push({
+                  pathname: `/product/[id]`,
+                  params: { id: item.product.id , from: "home" },
+                })}
                 activeOpacity={0.9}
               >
                 <Image
@@ -150,7 +153,10 @@ export const  HeroCarousel = ({ slides }: HeroCarouselProps) => {
 
                     <TouchableOpacity
                       activeOpacity={0.88}
-                      onPress={() => router.push(`/product/${item.product.id}`)}
+                      onPress={() => router.push({
+                        pathname: `/product/[id]`,
+                        params: { id: item.product.id, from: "home" }
+                      })}
                       className="rounded-full bg-white px-4 py-2"
                     >
                       <Text className="text-sm font-semibold uppercase tracking-[1px] text-zinc-950">

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -45,11 +45,6 @@ const WishlistScreen = () => {
       console.error("Error updating wishlist view layer:", error);
     }
   }, [isSignedIn, getToken, fetchUserWishlist]);
-
-  // Sync state on base initialization mounts
-  useEffect(() => {
-    loadWishlistData();
-  }, [loadWishlistData]);
 
   // Handle pull-to-refresh interactions cleanly
   const handleRefresh = useCallback(async () => {
@@ -150,7 +145,10 @@ const WishlistScreen = () => {
             <WishlistProductCard
               item={item}
               onRemovePress={() => handleWishlistToggle(item)}
-              categoryName={categories.find((c) => c.id === item.categoryId)?.name || "Sneakers"}
+              categoryName={
+                categories.find((c) => c.id === item.categoryId)?.name ||
+                "Sneakers"
+              }
             />
           )}
         />

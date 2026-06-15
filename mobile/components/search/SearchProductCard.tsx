@@ -1,28 +1,30 @@
-import { useCategoryStore } from "@/store/categoryStore";
 import { Product } from "@/types";
 import { formatPrice } from "@/utils/price.utils";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import { TouchableOpacity, View, Text, Image } from "react-native";
 
 const SearchProductCard = ({
   item,
+  categoryName,
   onWishlistPress,
   getProductImageUrl,
   isWishlisted = false,
 }: {
   item: Product;
+  categoryName?: string;
   getProductImageUrl: (product: Product) => string;
-  onWishlistPress: () => void;
+  onWishlistPress: (item: Product) => void;
   isWishlisted: boolean;
 }) => {
-  const { categories } = useCategoryStore();
-  const itemCategory = categories.find((c) => c.id === item.categoryId);
-  const parsedRating = parseFloat(item.averageRating || "0");
+  const router = useRouter();
+  const parsedRating = Number(item.averageRating) || 0;
 
   return (
     <TouchableOpacity
-      onPress={() => router.push(`/product/${item.id}` as any)}
+      onPress={() =>
+        router.push({ pathname: "/product/[id]", params: { id: item.id , from: "search" } })
+      }
       activeOpacity={0.9}
       className="flex-1 bg-transparent p-1.5 m-1 mt-2" // Transparent outer frame, equal grid gaps
     >
@@ -45,7 +47,7 @@ const SearchProductCard = ({
 
         {/* Wishlist Icon */}
         <TouchableOpacity
-          onPress={onWishlistPress}
+          onPress={() => onWishlistPress(item)}
           hitSlop={12}
           activeOpacity={0.9}
           className="absolute right-4 top-4 z-10 h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-sm"
@@ -64,7 +66,7 @@ const SearchProductCard = ({
           className="text-[9px] font-bold uppercase tracking-[1.2px] text-zinc-500"
           numberOfLines={1}
         >
-          {item.brand} - {itemCategory?.name || "Sneakers"}
+          {item.brand} - {categoryName || "Sneakers"}
         </Text>
 
         <Text

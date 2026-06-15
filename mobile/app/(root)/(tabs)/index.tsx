@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { RefreshControl, ScrollView, View, Text } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,6 +26,8 @@ if (!BACKEND_URL) {
 
 export default function HomeScreen() {
   const router = useRouter();
+
+  const firstRender = useRef(true);
 
   // 1. Data Fetching State Blocks
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
@@ -137,7 +139,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoading(true);
-      await Promise.all([
+      await Promise.allSettled([
         fetchCategories(),
         fetchBrands(),
         fetchNewArrivals("All", "All"),
@@ -148,14 +150,23 @@ export default function HomeScreen() {
     };
 
     loadInitialData();
-  }, [fetchBrands, fetchCategories, fetchFeatured, fetchNewArrivals, fetchTrending]);
+  }, [
+    fetchBrands,
+    fetchCategories,
+    fetchFeatured,
+    fetchNewArrivals,
+    fetchTrending,
+  ]);
 
   // --- FILTER LISTENER (Runs every time the user taps a chip) ---
   useEffect(() => {
-    if (isLoading) return;
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
 
     const reFetchProducts = async () => {
-      await Promise.all([
+      await Promise.allSettled([
         fetchNewArrivals(selectedCategoryId, selectedBrand),
         fetchTrending(selectedCategoryId, selectedBrand),
         fetchFeatured(selectedCategoryId, selectedBrand),
@@ -169,7 +180,6 @@ export default function HomeScreen() {
     fetchNewArrivals,
     fetchTrending,
     fetchFeatured,
-    isLoading,
   ]);
 
   // --- GESTURE PULL-TO-REFRESH HANDLER ---
@@ -178,7 +188,7 @@ export default function HomeScreen() {
     setSelectedCategoryId("All");
     setSelectedBrand("All");
 
-    await Promise.all([
+    await Promise.allSettled([
       fetchCategories(),
       fetchBrands(),
       fetchNewArrivals("All", "All"),

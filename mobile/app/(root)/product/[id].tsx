@@ -27,7 +27,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BACKEND_URL = ENV.API_URL;
 
 export default function ProductDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from: string }>();
   const router = useRouter();
   const { getToken } = useAuth();
   const { isWishlisted, toggleWishlist } = useWishlistStore();
@@ -42,6 +42,18 @@ export default function ProductDetailScreen() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [sizeChartVisible, setSizeChartVisible] = useState(false);
+
+  const handleBack = () => {
+    if (from === "search") {
+      router.replace("/(root)/(tabs)/search");
+    } else if (from === "wishlist") {
+      router.replace("/(root)/(tabs)/wishlist");
+    } else if (from === "cart") {
+      router.replace("/(root)/(tabs)/cart");
+    }else{
+      router.replace("/(root)/(tabs)");
+    }
+  };
 
   // Fetch individual product schema layout payload
   useEffect(() => {
@@ -321,7 +333,7 @@ export default function ProductDetailScreen() {
         </Text>
         <TouchableOpacity
           className="mt-4 bg-zinc-950 px-6 py-3 rounded-full"
-          onPress={() => router.back()}
+          onPress={handleBack}
         >
           <Text className="text-white font-semibold">Return To Shop</Text>
         </TouchableOpacity>
@@ -336,18 +348,18 @@ export default function ProductDetailScreen() {
       {/* 1. FIXED PREMIUM HEADER ACTION TRACK BAR */}
       <View className="flex-row items-center justify-between px-6 py-4 border-b border-zinc-100 bg-white">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="flex-row items-center gap-2 py-1"
           activeOpacity={0.7}
         >
           <Ionicons name="arrow-back" size={20} color="#18181b" />
-          <Text className="text-sm font-bold text-zinc-900 tracking-tight">
+          <Text className="text-sm font-bold text-zinc-900 ">
             Shop
           </Text>
         </TouchableOpacity>
 
         <Text
-          className="text-xs font-black uppercase tracking-[2px] text-zinc-900 max-w-[160px]"
+          className="text-xs font-black uppercase text-zinc-900 max-w-[160px]"
           numberOfLines={1}
         >
           {product.brand}

@@ -55,12 +55,22 @@ export default function CheckoutScreen() {
   const totalAmount = subtotal + shippingFee - discount;
 
   useEffect(() => {
+    let mounted = true;
+
     const loadData = async () => {
       const token = await getToken();
-      if (token) await fetchAddresses(token);
+
+      if (mounted && token) {
+        await fetchAddresses(token);
+      }
     };
+
     loadData();
-  }, [fetchAddresses, getToken]);
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (addresses.length > 0 && !selectedAddressId) {
@@ -81,7 +91,7 @@ export default function CheckoutScreen() {
 
     try {
       setIsProcessing(true);
-      const token = await getToken();
+      let token = await getToken();
       if (!token)
         throw new Error("Authentication failed. Please sign in again.");
 
@@ -140,6 +150,10 @@ export default function CheckoutScreen() {
         });
         return;
       }
+
+      token = await getToken();
+      if (!token)
+        throw new Error("Authentication failed. Please sign in again.");
 
       // 🔄 Syncing local states instantly via fallback synchronous request engine
       await updateOrderPaymentStatus(token, orderId);

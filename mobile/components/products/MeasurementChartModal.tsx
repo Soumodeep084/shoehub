@@ -72,11 +72,13 @@ function SizeTable({ title, data }: { title: string; data: SizeRow[] }) {
 export default function MeasurementChartModal({
   isVisible,
   onClose,
+  defaultTab,
 }: {
   isVisible: boolean;
   onClose: () => void;
+  defaultTab: "Men" | "Women";
 }) {
-  const [selectedTab, setSelectedTab] = useState<"Men" | "Women">("Men");
+  const [selectedTab, setSelectedTab] = useState<"Men" | "Women">(defaultTab);
 
   // Safe shadow definition for clean cross-platform execution
   const activeTabStyle = {
