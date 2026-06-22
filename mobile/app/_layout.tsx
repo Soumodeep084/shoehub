@@ -27,7 +27,6 @@ if (!stripePublishableKey) {
   throw new Error("Add your Stripe Publishable Key to the .env file");
 }
 
-
 export default function RootLayout() {
   return (
     <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>

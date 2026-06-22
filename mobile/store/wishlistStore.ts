@@ -19,6 +19,7 @@ interface WishlistState {
     fetchUserWishlist: (token: string) => Promise<void>;
     toggleWishlist: (token: string, item: WishlistItem) => Promise<void>;
     isWishlisted: (productId: string) => boolean;
+    getWishlistCount: () => number;
     clearWishlist: () => void;
 }
 
@@ -119,6 +120,10 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
 
     isWishlisted: (productId) => {
         return get().items.some((item) => item.productId === productId);
+    },
+
+    getWishlistCount: () => {
+        return get().items.length;
     },
 
     clearWishlist: () => set({ items: [] }),

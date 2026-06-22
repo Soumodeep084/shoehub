@@ -71,6 +71,7 @@ export default function AccountScreen() {
               text1: "Logout failed",
               text2: "Please try again.",
             });
+            console.error("LOGOUT_ERROR", error);
           }
         },
       },

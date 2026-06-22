@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -10,38 +10,56 @@ import {
   FlatList,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { formatPrice } from "@/utils/price.utils";
-import type { Product } from "@/types";
+import type { Product, Review } from "@/types";
 import { ENV } from "@/config/env";
 import MeasurementChartModal from "@/components/products/MeasurementChartModal";
 import { useWishlistStore } from "@/store/wishlistStore";
 import { useCartStore } from "@/store/cartStore";
-import { useAuth } from "@clerk/expo";
+import { useAuth, useUser } from "@clerk/expo";
 import Toast from "react-native-toast-message";
-
+import { useReviewStore } from "@/store/reviewStore";
+import ReviewCard from "@/components/reviews/ReviewCard";
+import ReviewOptionsSheet from "@/components/reviews/ReviewOptionsSheet";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BACKEND_URL = ENV.API_URL;
 
 export default function ProductDetailScreen() {
   const { id, from } = useLocalSearchParams<{ id: string; from: string }>();
+  const { user } = useUser();
   const router = useRouter();
   const { getToken } = useAuth();
   const { isWishlisted, toggleWishlist } = useWishlistStore();
   const { addToCart, isInCart } = useCartStore();
+  const {
+    reviews,
+    ratingSummary,
+    fetchReviews,
+    deleteReview,
+    isLoading,
+    canReview,
+    hasReviewed,
+    clearReviews,
+  } = useReviewStore();
 
   const mainListRef = useRef<FlatList>(null);
 
   // Core Data & UI State Framework
   const [product, setProduct] = useState<Product | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isProductLoading, setIsProductLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [sizeChartVisible, setSizeChartVisible] = useState(false);
+
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
+  const [selectedIsMine, setSelectedIsMine] = useState(false);
 
   const handleBack = () => {
     if (from === "search") {
@@ -50,45 +68,54 @@ export default function ProductDetailScreen() {
       router.replace("/(root)/(tabs)/wishlist");
     } else if (from === "cart") {
       router.replace("/(root)/(tabs)/cart");
-    }else{
+    } else {
       router.replace("/(root)/(tabs)");
     }
   };
 
-  // Fetch individual product schema layout payload
-  useEffect(() => {
-    if (!id) return;
-    const fetchProductDetails = async () => {
-      try {
-        setIsLoading(true);
-        const res = await fetch(`${BACKEND_URL}/api/products/${id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setProduct(data);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!id) return;
+      const fetchProductDetails = async () => {
+        try {
+          setIsProductLoading(true);
+          const res = await fetch(`${BACKEND_URL}/api/products/${id}`);
+          if (res.ok) {
+            const data = await res.json();
+            setProduct(data);
 
-          if (data.variants && data.variants.length > 0) {
-            const firstInStock = data.variants.find(
-              (v: { stock: number }) => v.stock > 0,
-            );
-            if (firstInStock) {
-              setSelectedSize(firstInStock.size);
-              setSelectedColor(firstInStock.color);
+            if (data.variants && data?.variants?.length > 0) {
+              const firstInStock = data.variants.find(
+                (v: { stock: number }) => v.stock > 0,
+              );
+              if (firstInStock) {
+                setSelectedSize(firstInStock.size);
+                setSelectedColor(firstInStock.color);
+              }
             }
           }
+        } catch (error) {
+          console.error("Error fetching product detail:", error);
+        } finally {
+          setIsProductLoading(false);
         }
-      } catch (error) {
-        console.error("Error fetching product detail:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      };
 
-    fetchProductDetails();
-  }, [id]);
+      const load = async () => {
+        const token = await getToken();
 
+        await fetchProductDetails();
+        clearReviews();
+        await fetchReviews(id, token);
+      };
+
+      load();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]),
+  );
   // Gallery Organizer: Prioritize Primary Images safely
   const sortedImages = useMemo(() => {
-    if (!product?.images || product.images.length === 0) {
+    if (!product?.images || product?.images?.length === 0) {
       return [
         {
           id: "placeholder",
@@ -107,7 +134,7 @@ export default function ProductDetailScreen() {
   // Dynamic Size Allocator
   const uniqueSizes = useMemo(() => {
     if (!product?.variants) return [];
-    const sizesMap = product.variants.map((v) => v.size);
+    const sizesMap = product?.variants?.map((v) => v.size);
     return Array.from(new Set(sizesMap)).sort(
       (a, b) => parseFloat(a) - parseFloat(b),
     );
@@ -214,7 +241,7 @@ export default function ProductDetailScreen() {
     if (
       computedIndex !== activeImageIndex &&
       computedIndex >= 0 &&
-      computedIndex < sortedImages.length
+      computedIndex < sortedImages?.length
     ) {
       setActiveImageIndex(computedIndex);
     }
@@ -317,7 +344,7 @@ export default function ProductDetailScreen() {
     }
   };
 
-  if (isLoading) {
+  if (isProductLoading) {
     return (
       <View className="flex-1 bg-zinc-50 items-center justify-center">
         <ActivityIndicator size="large" color="#18181b" />
@@ -343,6 +370,12 @@ export default function ProductDetailScreen() {
 
   const parsedRating = parseFloat(product.averageRating || "0");
 
+  const handleReviewOptions = (review: Review, isMine: boolean) => {
+    setSelectedReview(review);
+    setSelectedIsMine(isMine);
+    setSheetVisible(true);
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
       {/* 1. FIXED PREMIUM HEADER ACTION TRACK BAR */}
@@ -353,9 +386,7 @@ export default function ProductDetailScreen() {
           activeOpacity={0.7}
         >
           <Ionicons name="arrow-back" size={20} color="#18181b" />
-          <Text className="text-sm font-bold text-zinc-900 ">
-            Shop
-          </Text>
+          <Text className="text-sm font-bold text-zinc-900 ">Shop</Text>
         </TouchableOpacity>
 
         <Text
@@ -405,7 +436,7 @@ export default function ProductDetailScreen() {
           {/* Luxury Floating Numerical Counter Frame Overlay */}
           <View className="absolute right-5 bottom-5 bg-black/80 px-3 py-1.5 rounded-full border border-white/10">
             <Text className="text-[10px] font-black tracking-widest text-white uppercase">
-              {activeImageIndex + 1} / {sortedImages.length}
+              {activeImageIndex + 1} / {sortedImages?.length}
             </Text>
           </View>
 
@@ -420,7 +451,7 @@ export default function ProductDetailScreen() {
         </View>
 
         {/* 3. SCROLLABLE SYNCED PREVIEW THUMBNAIL TRACK */}
-        {sortedImages.length > 1 && (
+        {sortedImages?.length > 1 && (
           <View className="py-4 border-b border-zinc-100 bg-white">
             <ScrollView
               horizontal
@@ -428,11 +459,11 @@ export default function ProductDetailScreen() {
               contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
             >
               {/* Change this block */}
-              {sortedImages.map((img, idx) => {
+              {sortedImages?.map((img, idx) => {
                 const isCurrent = idx === activeImageIndex;
                 return (
                   <TouchableOpacity
-                    key={img.id}
+                    key={img?.id}
                     onPress={() => scrollToImage(idx)}
                     activeOpacity={0.8}
                     className={`w-16 h-16 rounded-[14px] overflow-hidden bg-zinc-50 border-2 ${
@@ -445,7 +476,7 @@ export default function ProductDetailScreen() {
                     }}
                   >
                     <Image
-                      source={{ uri: img.imageUrl }}
+                      source={{ uri: img?.imageUrl }}
                       className="w-full h-full"
                       resizeMode="cover"
                     />
@@ -526,7 +557,7 @@ export default function ProductDetailScreen() {
 
             {/* Size Button Matrix Layout */}
             <View className="flex-row flex-wrap gap-2.5">
-              {uniqueSizes.map((size) => {
+              {uniqueSizes?.map((size) => {
                 const isSelected = selectedSize === size;
 
                 const variantsForSize =
@@ -672,7 +703,7 @@ export default function ProductDetailScreen() {
                 <View
                   key={i}
                   className={`flex-row items-center justify-between p-4 ${
-                    i !== specifications.length - 1
+                    i !== specifications?.length - 1
                       ? "border-b border-zinc-100"
                       : ""
                   }`}
@@ -732,19 +763,78 @@ export default function ProductDetailScreen() {
 
           {/* 10. REVIEWS INBOUND FALLBACK STANDALONE CORE DECK */}
           <View className="mt-8 border-t border-zinc-100 pt-6">
-            <Text className="text-xs font-black uppercase tracking-wider text-zinc-900 mb-2">
-              Verified Buyer Reviews
-            </Text>
-            <View className="bg-zinc-50/50 border border-dashed border-zinc-200 p-6 rounded-2xl items-center justify-center mt-2">
-              <Ionicons name="chatbubbles-outline" size={22} color="#a1a1aa" />
-              <Text className="text-sm font-bold text-zinc-800 mt-2">
-                Product Reviews Coming Soon
+            <View className="mb-5 flex-row items-center justify-between">
+              <Text className="text-xs font-black uppercase tracking-wider text-zinc-900">
+                Customer Reviews
               </Text>
-              <Text className="text-xs text-zinc-400 mt-1 text-center leading-4 max-w-[220px]">
-                We are actively processing verified purchase scoring datasets
-                for this model.
-              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                disabled={!canReview}
+                onPress={() =>
+                  router.push({
+                    pathname: "/review/review-form",
+                    params: {
+                      productId: product.id,
+                    },
+                  })
+                }
+                className={!canReview ? "opacity-50" : ""}
+              >
+                <Text className="text-sm font-bold text-zinc-900">
+                  {hasReviewed ? "Reviewed" : "Write Review"}
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            {/* Rating Summary */}
+            {ratingSummary && (
+              <View className="mb-4 bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                <View className="flex-row items-center">
+                  <Text className="text-3xl font-black text-zinc-900">
+                    {ratingSummary.average.toFixed(1)}
+                  </Text>
+
+                  <Ionicons
+                    name="star"
+                    size={24}
+                    color="#f59e0b"
+                    style={{ marginLeft: 6 }}
+                  />
+                </View>
+                <Text className="text-xs text-zinc-500">
+                  Based on {ratingSummary.total} reviews
+                </Text>
+              </View>
+            )}
+
+            {/* Reviews List */}
+            {isLoading ? (
+              <ActivityIndicator />
+            ) : (reviews ?? []).length === 0 ? (
+              <View className="items-center rounded-2xl bg-zinc-50 p-6">
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={24}
+                  color="#a1a1aa"
+                />
+
+                <Text className="mt-2 text-sm font-bold">No reviews yet</Text>
+
+                <Text className="mt-1 text-center text-xs text-zinc-500">
+                  Be the first customer to review this product.
+                </Text>
+              </View>
+            ) : (
+              (reviews ?? []).map((item) => (
+                <ReviewCard
+                  key={item.id}
+                  review={item}
+                  isMine={item.user.clerkId === user?.id}
+                  onMorePress={handleReviewOptions}
+                />
+              ))
+            )}
           </View>
         </View>
       </ScrollView>
@@ -784,6 +874,97 @@ export default function ProductDetailScreen() {
         isVisible={sizeChartVisible}
         onClose={() => setSizeChartVisible(false)}
         defaultTab="Men"
+      />
+
+      <ReviewOptionsSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        review={selectedReview}
+        isMine={selectedIsMine}
+        onEdit={() => {
+          setSheetVisible(false);
+
+          if (!selectedReview) return;
+
+          router.push({
+            pathname: "/review/review-form",
+            params: {
+              mode: "edit",
+              editableReviewId: selectedReview.id,
+              productId: product.id,
+            },
+          });
+        }}
+        onDelete={() => {
+          setSheetVisible(false);
+
+          if (!selectedReview) return;
+
+          Alert.alert(
+            "Delete Review",
+            "Are you sure you want to permanently delete this review?",
+            [
+              {
+                text: "Cancel",
+                style: "cancel",
+              },
+              {
+                text: "Delete",
+                style: "destructive",
+                onPress: async () => {
+                  try {
+                    const token = await getToken();
+
+                    if (!token) {
+                      Toast.show({
+                        type: "error",
+                        text1: "Login required",
+                      });
+                      return;
+                    }
+
+                    await deleteReview(selectedReview.id, token);
+
+                    Toast.show({
+                      type: "success",
+                      text1: "Review deleted successfully",
+                    });
+
+                    await fetchReviews(product.id, token);
+                  } catch (error) {
+                    console.error(error);
+
+                    Toast.show({
+                      type: "error",
+                      text1: "Failed to delete review",
+                    });
+                  }
+                },
+              },
+            ],
+          );
+        }}
+        onReport={() => {
+          setSheetVisible(false);
+
+          Alert.alert("Report Review", "Do you want to report this review?", [
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
+            {
+              text: "Report",
+              style: "destructive",
+              onPress: () => {
+                Toast.show({
+                  type: "info",
+                  text1: "Coming Soon",
+                  text2: "Reporting reviews will be available soon.",
+                });
+              },
+            },
+          ]);
+        }}
       />
     </SafeAreaView>
   );

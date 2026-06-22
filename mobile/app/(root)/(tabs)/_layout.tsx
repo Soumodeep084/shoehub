@@ -1,5 +1,6 @@
 // import { useUserStore } from "@/store/userStore";
 import { useCartStore } from "@/store/cartStore";
+import { useWishlistStore } from "@/store/wishlistStore";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import {
@@ -12,6 +13,7 @@ import { Platform } from "react-native";
 
 function AndroidTabs() {
   const cartItemsCount = useCartStore((state) => state.getCartCount());
+  const wishlistItemsCount = useWishlistStore((state) => state.getWishlistCount());
   return (
     <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen
@@ -49,6 +51,8 @@ function AndroidTabs() {
         name="wishlist"
         options={{
           title: "WishList",
+          tabBarBadge: wishlistItemsCount > 0 ? wishlistItemsCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: "red", color: "white" , fontSize: 11, minWidth: 16, height: 16, fontWeight: "bold", paddingHorizontal: 4, lineHeight: 16},
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="heart" color={color} size={size} />
           ),
@@ -82,6 +86,7 @@ function AndroidTabs() {
 
 function IOSTabs() {
   const cartItemsCount = useCartStore((state) => state.getCartCount());
+  const wishlistItemsCount = useWishlistStore((state) => state.getWishlistCount());
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -102,6 +107,7 @@ function IOSTabs() {
       )} */}
 
       <NativeTabs.Trigger name="wishlist">
+        <Badge>{wishlistItemsCount > 0 ? String(wishlistItemsCount) : undefined}</Badge>
         <Icon sf="heart.fill" />
         <Label>WishList</Label>
       </NativeTabs.Trigger>

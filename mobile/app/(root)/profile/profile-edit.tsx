@@ -1,4 +1,4 @@
-import { useAuth, useUser } from "@clerk/expo";
+import { useUser } from "@clerk/expo";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 
@@ -15,9 +15,6 @@ import Toast from "react-native-toast-message";
 import { FormField } from "@/components/profile/FormField";
 import { SectionCard } from "@/components/profile/SectionCard";
 
-import { ENV } from "@/config/env";
-
-const BACKEND_URL = ENV.API_URL;
 export default function ProfileEditScreen() {
   const router = useRouter();
   const { user } = useUser();

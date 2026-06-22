@@ -48,7 +48,8 @@
         {
           "enableGooglePay": true
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

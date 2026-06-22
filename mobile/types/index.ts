@@ -158,6 +158,44 @@ export interface Order {
 	itemCount?: number;
 }
 
+export type ReviewMediaType = "IMAGE" | "VIDEO";
+
+export interface ReviewMedia {
+	id: string;
+	type: ReviewMediaType;
+	url: string;
+}
+
+export interface ReviewUser {
+	clerkId: string;
+	firstName: string;
+	lastName: string;
+	imageUrl: string | null;
+}
+
+export interface Review {
+	id: string;
+	userId: string;
+	productId: string;
+	rating: number;
+	comment: string | null;
+	createdAt: string;
+	updatedAt: string;
+
+	user: ReviewUser;
+	media: ReviewMedia[];
+}
+
+export interface RatingSummary {
+	total: number;
+	average: number;
+}
+
+export interface ProductReviewsResponse {
+	reviews: Review[];
+	ratingSummary: RatingSummary;
+}
+
 export interface ProfileStats {
 	addressCount: number;
 	orderCount: number;

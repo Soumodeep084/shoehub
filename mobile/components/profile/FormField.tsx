@@ -10,6 +10,10 @@ export const FormField = ({
   required = true,
   keyboardType = "default",
   autoCapitalize = "sentences",
+  multiline = false,
+  numberOfLines = 1,
+  maxLength,
+  disabled = false
 }: {
   label: string;
   value: string;
@@ -19,6 +23,10 @@ export const FormField = ({
   required?: boolean;
   keyboardType?: any;
   autoCapitalize?: any;
+  multiline?: boolean;
+  numberOfLines?: number;
+  maxLength?: number;
+  disabled?: boolean;
 }) => (
   <View className="mb-5">
     <Text className="mb-2 text-[11px] font-black uppercase tracking-[1px] text-zinc-500 select-none">
@@ -32,13 +40,18 @@ export const FormField = ({
     <TextInput
       value={value}
       onChangeText={onChangeText}
-      placeholder={placeholder ? placeholder : `Enter ${label.toLowerCase()}`}
+      placeholder={placeholder ?? `Enter ${label.toLowerCase()}`}
       placeholderTextColor="#a1a1aa"
       keyboardType={keyboardType}
       autoCapitalize={autoCapitalize}
+      multiline={multiline}
+      numberOfLines={numberOfLines}
+      maxLength={maxLength}
+      textAlignVertical={multiline ? "top" : "center"}
       className={`rounded-2xl border bg-white px-4 py-4 text-[15px] font-medium text-zinc-900 ${
-        error ? "border-red-400" : "border-zinc-200"
-      }`}
+        multiline ? "min-h-[140px]" : ""
+      } ${error ? "border-red-400" : "border-zinc-200"}`}
+      disableFullscreenUI={disabled}
     />
 
     {error ? (

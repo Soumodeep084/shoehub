@@ -31,6 +31,7 @@ model User {
   carts     Cart[]
   addresses Address[]
   orders    Order[]
+  reviews   Review[]
 
   @@index([clerkId])
   @@index([email])
@@ -102,6 +103,7 @@ model Product {
   wishlists  Wishlist[]
   carts      Cart[]
   orderItems OrderItem[]
+  reviews    Review[]
 
   @@index([categoryId])
   @@index([brand])
@@ -257,4 +259,48 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+}
+
+enum ReviewMediaType {
+  IMAGE
+  VIDEO
+}
+
+model Review {
+  id String @id @default(uuid())
+
+  userId    String
+  productId String
+
+  rating  Int
+  comment String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  media ReviewMedia[]
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@index([userId])
+  @@map("reviews")
+}
+
+model ReviewMedia {
+  id       String @id @default(uuid())
+  reviewId String
+
+  type ReviewMediaType
+  url  String
+  path String? // supabase storage path (important for delete later)
+
+  createdAt DateTime @default(now())
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+  @@map("review_media")
 }
