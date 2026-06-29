@@ -12,10 +12,34 @@ if (process.env.NODE_ENV === "production" && !connectionString) {
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 
-export const prisma =
+const basePrisma =
   globalForDB.db ||
   new PrismaClient({
     adapter: adapter,
   });
 
-if (process.env.NODE_ENV !== "production") globalForDB.db = prisma;
+if (process.env.NODE_ENV !== "production") globalForDB.db = basePrisma;
+
+export const prisma = basePrisma.$extends({
+  query: {
+    $allModels: {
+      async $allOperations({ model, operation, args, query }) {
+        const softDeleteModels = ["Product", "Category", "Coupon", "BankOffer"];
+        if (softDeleteModels.includes(model)) {
+          if ([
+            "findMany", "findFirst", "findFirstOrThrow",
+            "findUnique", "findUniqueOrThrow", "count", "aggregate", "groupBy"
+          ].includes(operation)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const a = args as any;
+            a.where = a.where || {};
+            if (a.where.isDeleted === undefined) {
+              a.where.isDeleted = false;
+            }
+          }
+        }
+        return query(args);
+      },
+    },
+  },
+});
