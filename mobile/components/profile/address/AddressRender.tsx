@@ -62,7 +62,7 @@ const AddressRender = ({
           icon="create-outline"
           onPress={() =>
             router.push({
-              pathname: "/address-form",
+              pathname: "/address-form" as any,
               params: { id: item.id },
             })
           }

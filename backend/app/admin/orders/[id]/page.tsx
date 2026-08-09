@@ -13,6 +13,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { OrderStatusUpdate } from "@/components/admin/orders/order-status-update";
+import { DeliveryAssign } from "@/components/admin/orders/delivery-assign";
+import { currentUser } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 
 interface OrderDetailPageProps {
@@ -28,6 +31,12 @@ export default async function OrderDetailPage({
   if (!order) {
     notFound();
   }
+
+  const sessionUser = await currentUser();
+  const dbUser = sessionUser
+    ? await prisma.user.findUnique({ where: { clerkId: sessionUser.id } })
+    : null;
+  const isAdmin = dbUser?.role === "ADMIN";
 
   return (
     <div className="space-y-6">
@@ -75,6 +84,7 @@ export default async function OrderDetailPage({
                               src={item.productImageUrl}
                               alt={item.productName}
                               className="h-10 w-10 rounded object-cover"
+                              unoptimized
                             />
                           )}
                           <div>
@@ -165,101 +175,151 @@ export default async function OrderDetailPage({
               </div>
             </CardContent>
           </Card>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Payment & Timeline */}
+            <Card className="">
+              <CardHeader>
+                <CardTitle className="text-base">Payment & Timeline</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Created At</span>
+                  <span className="text-foreground">
+                    {formatDateTime(order.createdAt)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Last Updated</span>
+                  <span className="text-foreground">
+                    {formatDateTime(order.updatedAt)}
+                  </span>
+                </div>
+
+                <Separator className="my-1" />
+
+                {order.paymentMethod && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Payment Method</span>
+                    <span className="font-medium text-foreground">
+                      {order.paymentMethod}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Payment Status</span>
+                  <span className="font-medium text-foreground">
+                    {order.paymentStatus}
+                  </span>
+                </div>
+
+                {order.stripePaymentIntentId && (
+                  <div className="space-y-1 pt-1">
+                    <span className="text-xs text-muted-foreground block">
+                      Stripe Transaction ID
+                    </span>
+                    <code className="text-xs font-mono bg-muted p-1.5 rounded block text-foreground overflow-x-auto break-all select-all">
+                      {order.stripePaymentIntentId}
+                    </code>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Order Event Timeline */}
+            <Card>
+              <CardHeader className="pb-3 border-b border-border bg-muted/20">
+                <CardTitle className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+                  Order Event Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                {order.events && order.events.length > 0 ? (
+                  <div className="relative border-l border-border pl-4 ml-2 space-y-5">
+                    {order.events.map((event) => (
+                      <div key={event.id} className="relative">
+                        {/* Timeline dot */}
+                        <span className="absolute -left-[21.5px] top-1 flex h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-foreground">
+                              {event.title}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-semibold">
+                              {formatDateTime(event.createdAt)}
+                            </span>
+                          </div>
+                          {event.description && (
+                            <p className="text-xs text-muted-foreground">
+                              {event.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No events recorded for this order.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Customer Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Customer Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <p className="font-medium">
+                  {order.user.firstName} {order.user.lastName}
+                </p>
+                <p className="text-muted-foreground">{order.user.email}</p>
+              </CardContent>
+            </Card>
+
+            {/* Shipping Address */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Shipping Address</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <p className="font-medium"><span className="font-semibold text-foreground">Shipping Name : </span>{order.shippingName}</p>
+                <p className="text-muted-foreground"><span className="font-semibold text-foreground">Phone : </span>{order.shippingPhone}</p>
+                <p className="text-muted-foreground"><span className="font-semibold text-foreground">Address 1 : </span>{order.shippingLine1}</p>
+                {order.shippingLine2 && (
+                  <p className="text-muted-foreground"><span className="font-semibold text-foreground">Address 2 : </span>{order.shippingLine2}</p>
+                )}
+                <p className="text-muted-foreground"><span className="font-semibold text-foreground">City : </span>{order.shippingCity}</p>
+                <p className="text-muted-foreground"><span className="font-semibold text-foreground">State : </span>{order.shippingState}</p>
+                <p className="text-muted-foreground"><span className="font-semibold text-foreground">Pincode : </span>{order.shippingPostalCode}</p>
+                <p className="text-muted-foreground"><span className="font-semibold text-foreground">Country : </span>{order.shippingCountry}</p>
+                {order.shippingLandmark && (
+                  <p className="text-muted-foreground"><span className="font-semibold text-foreground">Landmark : </span>{order.shippingLandmark}</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Update Status */}
           <OrderStatusUpdate
             orderId={order.id}
             currentStatus={order.status}
             currentPaymentStatus={order.paymentStatus}
+            paymentMethod={order.paymentMethod}
           />
 
-          {/* Customer Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Customer Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              <p className="font-medium">
-                {order.user.firstName} {order.user.lastName}
-              </p>
-              <p className="text-muted-foreground">{order.user.email}</p>
-            </CardContent>
-          </Card>
-
-          {/* Shipping Address */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Shipping Address</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              <p className="font-medium"><span className="font-semibold text-foreground">Shipping Name : </span>{order.shippingName}</p>
-              <p className="text-muted-foreground"><span className="font-semibold text-foreground">Phone : </span>{order.shippingPhone}</p>
-              <p className="text-muted-foreground"><span className="font-semibold text-foreground">Address 1 : </span>{order.shippingLine1}</p>
-              {order.shippingLine2 && (
-                <p className="text-muted-foreground"><span className="font-semibold text-foreground">Address 2 : </span>{order.shippingLine2}</p>
-              )}
-              <p className="text-muted-foreground"><span className="font-semibold text-foreground">City : </span>{order.shippingCity}</p>
-              <p className="text-muted-foreground"><span className="font-semibold text-foreground">State : </span>{order.shippingState}</p>
-              <p className="text-muted-foreground"><span className="font-semibold text-foreground">Pincode : </span>{order.shippingPostalCode}</p>
-              <p className="text-muted-foreground"><span className="font-semibold text-foreground">Country : </span>{order.shippingCountry}</p>
-              {order.shippingLandmark && (
-                <p className="text-muted-foreground"><span className="font-semibold text-foreground">Landmark : </span>{order.shippingLandmark}</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Payment & Timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Payment & Timeline</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created At</span>
-                <span className="text-foreground">
-                  {formatDateTime(order.createdAt)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Last Updated</span>
-                <span className="text-foreground">
-                  {formatDateTime(order.updatedAt)}
-                </span>
-              </div>
-
-              <Separator className="my-1" />
-
-              {order.paymentMethod && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Payment Method</span>
-                  <span className="font-medium text-foreground">
-                    {order.paymentMethod}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Payment Status</span>
-                <span className="font-medium text-foreground">
-                  {order.paymentStatus}
-                </span>
-              </div>
-
-              {order.stripePaymentIntentId && (
-                <div className="space-y-1 pt-1">
-                  <span className="text-xs text-muted-foreground block">
-                    Stripe Transaction ID
-                  </span>
-                  <code className="text-xs font-mono bg-muted p-1.5 rounded block text-foreground overflow-x-auto break-all select-all">
-                    {order.stripePaymentIntentId}
-                  </code>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Delivery Assignment */}
+          <DeliveryAssign
+            orderId={order.id}
+            orderStatus={order.status}
+            deliveryStatus={order.deliveryStatus}
+            assignedAgent={order.deliveryAgent}
+            isAdmin={isAdmin}
+          />
         </div>
       </div>
     </div>

@@ -80,6 +80,18 @@ export default function ProfileTab() {
         onPress: () => router.push("/order/orders"),
       },
       {
+        title: "Notifications",
+        subtitle: "View your updates and alerts",
+        icon: "notifications-outline" as keyof typeof Ionicons.glyphMap,
+        onPress: () => router.push("/notifications" as any),
+      },
+      {
+        title: "Notification Preferences",
+        subtitle: "Manage what updates you receive",
+        icon: "settings-outline" as keyof typeof Ionicons.glyphMap,
+        onPress: () => router.push("/profile/notification-preferences" as any),
+      },
+      {
         title: "Security",
         subtitle: "Passwords and active sessions",
         icon: "shield-checkmark-outline" as keyof typeof Ionicons.glyphMap,

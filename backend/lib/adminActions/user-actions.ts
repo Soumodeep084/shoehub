@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
 import { clerkClient } from "@/lib/clerkClient";
+import { currentUser } from "@clerk/nextjs/server";
 
 interface GetUsersParams {
   page?: number;
@@ -134,5 +135,71 @@ export async function unBanUser(userId: string) {
     return { success: true };
   } catch (error: any) {
     return { error: error.message || "Failed to unBan user" };
+  }
+}
+
+export async function promoteToDeliveryAgent(userId: string) {
+  try {
+    const sessionUser = await currentUser();
+    if (!sessionUser) return { error: "Unauthorized" };
+
+    const adminUser = await prisma.user.findUnique({
+      where: { clerkId: sessionUser.id },
+    });
+    if (!adminUser || adminUser.role !== "ADMIN") {
+      return { error: "Forbidden: Only admins can perform this action" };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) return { error: "User not found" };
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: "DELIVERY_AGENT" },
+    });
+
+    await clerkClient.users.updateUser(user.clerkId, {
+      publicMetadata: { role: "DELIVERY_AGENT" },
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Promote to delivery agent error:", error);
+    return { error: error.message || "Failed to promote user" };
+  }
+}
+
+export async function demoteFromDeliveryAgent(userId: string) {
+  try {
+    const sessionUser = await currentUser();
+    if (!sessionUser) return { error: "Unauthorized" };
+
+    const adminUser = await prisma.user.findUnique({
+      where: { clerkId: sessionUser.id },
+    });
+    if (!adminUser || adminUser.role !== "ADMIN") {
+      return { error: "Forbidden: Only admins can perform this action" };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) return { error: "User not found" };
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: "USER" },
+    });
+
+    await clerkClient.users.updateUser(user.clerkId, {
+      publicMetadata: { role: "USER" },
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Demote from delivery agent error:", error);
+    return { error: error.message || "Failed to demote user" };
   }
 }

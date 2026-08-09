@@ -4,6 +4,7 @@ import { getCoupons, getCouponStats } from "@/lib/adminActions/coupon-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/admin/dashboard/page-header";
+import { ExportButtons } from "@/components/admin/dashboard/export-buttons";
 import { CouponsTable } from "@/components/admin/coupons/coupons-table";
 
 export default async function AdminCouponsPage() {
@@ -16,6 +17,7 @@ export default async function AdminCouponsPage() {
         description="Configure promotional campaign coupons, discount rates, and checkout rules."
       >
         <div className="flex gap-2">
+          <ExportButtons entity="coupons" />
           <Button variant="outline" size="sm" asChild className="h-9">
             <Link
               href="/admin/coupons/trash"

@@ -1,4 +1,4 @@
-// import { useUserStore } from "@/store/userStore";
+import { useUserStore } from "@/store/userStore";
 import { useCartStore } from "@/store/cartStore";
 import { useWishlistStore } from "@/store/wishlistStore";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +14,8 @@ import { Platform } from "react-native";
 function AndroidTabs() {
   const cartItemsCount = useCartStore((state) => state.getCartCount());
   const wishlistItemsCount = useWishlistStore((state) => state.getWishlistCount());
+  const role = useUserStore((state) => state.role);
+  const isDeliveryAgent = role === "DELIVERY_AGENT";
   return (
     <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen
@@ -72,6 +74,17 @@ function AndroidTabs() {
       />
 
       <Tabs.Screen
+        name="deliveries"
+        options={{
+          title: "Deliveries",
+          href: isDeliveryAgent ? undefined : null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bicycle" color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
@@ -87,6 +100,8 @@ function AndroidTabs() {
 function IOSTabs() {
   const cartItemsCount = useCartStore((state) => state.getCartCount());
   const wishlistItemsCount = useWishlistStore((state) => state.getWishlistCount());
+  const role = useUserStore((state) => state.role);
+  const isDeliveryAgent = role === "DELIVERY_AGENT";
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -117,6 +132,13 @@ function IOSTabs() {
         <Icon sf="bag.fill" />
         <Label>Cart</Label>
       </NativeTabs.Trigger>
+
+      {isDeliveryAgent && (
+        <NativeTabs.Trigger name="deliveries">
+          <Icon sf="bicycle" />
+          <Label>Deliveries</Label>
+        </NativeTabs.Trigger>
+      )}
 
       <NativeTabs.Trigger name="profile">
         <Icon sf="person.fill" />

@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 
 interface StatusBadgeProps {
-  type: "order" | "payment" | "role" | "active";
+  type: "order" | "payment" | "role" | "active" | "delivery";
   value: string | boolean;
   expiresAt?: Date | string | null;
 }
@@ -32,8 +32,32 @@ export function StatusBadge({ type, value, expiresAt }: StatusBadgeProps) {
       bgClass = "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400 border-violet-100 dark:border-violet-900/30 font-semibold";
     } else if (label === "STAFF") {
       bgClass = "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30 font-medium";
+    } else if (label === "DELIVERY_AGENT" || label === "DELIVERY AGENT") {
+      bgClass = "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-100 dark:border-amber-900/30 font-semibold";
     } else {
       bgClass = "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700";
+    }
+  } else if (type === "delivery") {
+    label = String(value).toUpperCase().replace(/_/g, " ");
+    switch (String(value).toUpperCase()) {
+      case "ASSIGNED":
+        bgClass = "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border-blue-100 dark:border-blue-900/30 font-medium";
+        break;
+      case "ACCEPTED":
+        bgClass = "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border-sky-100 dark:border-sky-900/30 font-medium";
+        break;
+      case "PICKED_UP":
+        bgClass = "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30 font-medium";
+        break;
+      case "OUT_FOR_DELIVERY":
+        bgClass = "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border-purple-100 dark:border-purple-900/30 font-semibold";
+        break;
+      case "DELIVERED":
+        bgClass = "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 font-semibold";
+        break;
+      default:
+        bgClass = "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700";
+        break;
     }
   } else if (type === "payment") {
     label = String(value).toUpperCase();
@@ -66,8 +90,14 @@ export function StatusBadge({ type, value, expiresAt }: StatusBadgeProps) {
       case "PROCESSING":
         bgClass = "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border-sky-100 dark:border-sky-900/30";
         break;
+      case "PACKED":
+        bgClass = "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400 border-yellow-100 dark:border-yellow-900/30";
+        break;
       case "SHIPPED":
         bgClass = "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30";
+        break;
+      case "OUT_FOR_DELIVERY":
+        bgClass = "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border-purple-100 dark:border-purple-900/30";
         break;
       case "CANCELLED":
       case "REFUNDED":

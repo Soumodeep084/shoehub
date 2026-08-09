@@ -5,6 +5,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { UserBanButton } from "@/components/admin/users/user-ban-button";
+import { UserRoleActions } from "@/components/admin/users/user-role-actions";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Table,
@@ -14,7 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { clerkClient } from "@/lib/clerkClient";
 
 interface UserDetailPageProps {
   params: Promise<{ id: string }>;
@@ -78,10 +78,15 @@ export default async function UserDetailPage({ params }: UserDetailPageProps) {
                 Joined {formatDate(user.createdAt)}
               </p>
               {user.role === "ADMIN" ? null : (
-                <div className="w-full pt-4">
+                <div className="w-full pt-4 space-y-2">
                   <UserBanButton
                     userId={user.id}
                     isBanned={user.isBanned}
+                    userEmail={user.email}
+                  />
+                  <UserRoleActions
+                    userId={user.id}
+                    role={user.role}
                     userEmail={user.email}
                   />
                 </div>

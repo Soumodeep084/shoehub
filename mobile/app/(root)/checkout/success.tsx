@@ -42,9 +42,9 @@ export default function SuccessScreen() {
           <View className="items-center">
             {/* ULTRA-PREMIUM GRADIENT RING EFFECT */}
             <View className="mt-4 shadow-xl shadow-emerald-500">
-              <View className="w-32 h-32 rounded-full bg-emerald-500 items-center justify-center border border-emerald-500">
-                <View className="w-24 h-24 rounded-full bg-emerald-500 items-center justify-center border border-emerald-500">
-                  <View className="w-16 h-16 rounded-full bg-red-500 items-center justify-center shadow-lg shadow-emerald-500">
+              <View className="w-32 h-32 rounded-full items-center justify-center border border-emerald-500">
+                <View className="w-24 h-24 rounded-full items-center justify-center border border-emerald-500">
+                  <View className="w-16 h-16 rounded-full items-center justify-center shadow-lg shadow-emerald-500">
                     <Ionicons
                       name={isCod ? "bag-check" : "checkmark-sharp"}
                       size={32}

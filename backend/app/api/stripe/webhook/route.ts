@@ -2,6 +2,11 @@
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
+import {
+    appendOrderEvent,
+    notifyOrderStatusChange,
+    reserveOrderInventory,
+} from "@/lib/orderLifecycle";
 
 export async function POST(req: Request) {
     try {
@@ -37,6 +42,7 @@ export async function POST(req: Request) {
         if (event.type === "payment_intent.succeeded") {
             const order = await prisma.order.findUnique({
                 where: { id: orderId },
+                include: { items: true },
             });
 
             // Prevent double-processing if webhook fires multiple times
@@ -44,18 +50,37 @@ export async function POST(req: Request) {
                 return Response.json({ received: true });
             }
 
-            // Mark order as paid & confirmed
-            await prisma.order.update({
-                where: { id: orderId },
-                data: {
-                    paymentStatus: "PAID",
-                    status: "CONFIRMED",
-                },
-            });
+            // Run stock reservation, events and state update in transaction
+            await prisma.$transaction(async (tx) => {
+                // 1. Reserve stock
+                await reserveOrderInventory(tx, order.items);
 
-            // Clear the user's shopping cart in the database
-            await prisma.cart.deleteMany({
-                where: { userId: order.userId },
+                // 2. Mark order as paid & confirmed
+                await tx.order.update({
+                    where: { id: orderId },
+                    data: {
+                        paymentStatus: "PAID",
+                        status: "CONFIRMED",
+                    },
+                });
+
+                // 3. Clear the user's shopping cart in the database
+                await tx.cart.deleteMany({
+                    where: { userId: order.userId },
+                });
+
+                // 4. Append timeline event
+                await appendOrderEvent(tx, {
+                    orderId: order.id,
+                    status: "CONFIRMED",
+                });
+
+                // 5. Notify customer
+                await notifyOrderStatusChange(tx, {
+                    userId: order.userId,
+                    orderId: order.id,
+                    status: "CONFIRMED",
+                });
             });
 
             console.log(`🔔 Webhook: Order ${orderId} successfully PAID.`);

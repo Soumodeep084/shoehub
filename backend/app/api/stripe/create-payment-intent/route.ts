@@ -31,8 +31,8 @@ export async function POST(req: Request) {
         }
 
         // Calculate the exact amount needed in paisa/cents
-        const rawAmount = order.totalAmount;
-        const targetAmountInCents = Math.round(parseFloat(rawAmount.toString()) * 100);
+        // const targetAmountInCents = Math.round(parseFloat(rawAmount.toString()) * 100);
+        const targetAmountInCents = 100;
 
         // Safety guard for low transaction balances
         if (targetAmountInCents < 50) {

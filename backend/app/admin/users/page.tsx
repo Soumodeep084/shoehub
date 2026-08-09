@@ -1,5 +1,6 @@
 import { getUsers } from "@/lib/adminActions/user-actions";
 import { PageHeader } from "@/components/admin/dashboard/page-header";
+import { ExportButtons } from "@/components/admin/dashboard/export-buttons";
 import { UserSearch } from "@/components/admin/users/user-search";
 import { UsersTable } from "@/components/admin/users/users-table";
 
@@ -31,7 +32,16 @@ export default async function UsersPage({ searchParams }: PageProps) {
       <PageHeader
         title="Users"
         description="Monitor registered customer profiles, transaction metrics, and manage account access lockouts."
-      />
+      >
+        <ExportButtons
+          entity="users"
+          params={{
+            search: params.search,
+            sortBy,
+            sortOrder,
+          }}
+        />
+      </PageHeader>
 
       <UserSearch />
 

@@ -11,9 +11,9 @@ export default async function AuthCallbackPage() {
     redirect("/sign-in");
   }
 
+
   // ✅ Tier 1: Check JWT metadata first
   const clerkRole = session.sessionClaims?.metadata?.role;
-
   if (clerkRole === "ADMIN") {
     redirect("/admin");
   }

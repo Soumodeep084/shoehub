@@ -1,5 +1,6 @@
 import { getOrders } from "@/lib/adminActions/order-actions";
 import { PageHeader } from "@/components/admin/dashboard/page-header";
+import { ExportButtons } from "@/components/admin/dashboard/export-buttons";
 import { OrderFilters } from "@/components/admin/orders/order-filters";
 import { OrdersTable } from "@/components/admin/orders/orders-table";
 
@@ -33,7 +34,17 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       <PageHeader
         title="Orders"
         description="Fulfill order deliveries, manage payments, and track sales receipts."
-      />
+      >
+        <ExportButtons
+          entity="orders"
+          params={{
+            status: params.status,
+            search: params.search,
+            sortBy,
+            sortOrder,
+          }}
+        />
+      </PageHeader>
 
       <OrderFilters />
 

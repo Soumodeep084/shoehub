@@ -1,11 +1,37 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentDbUser } from "@/lib/currentUser";
+import {
+  appendOrderEvent,
+  notifyOrderStatusChange,
+  reserveOrderInventory,
+} from "@/lib/orderLifecycle";
 
 function generateOrderNumber(userId: string) {
   const timestamp = Date.now();
   const splitUserId = userId.split("-")[0];
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
   return `ORD-${timestamp}-${splitUserId}-${randomSuffix}`;
+}
+
+// ─── Discount Calculator ────────────────────────────────────────────────────
+function calculateDiscount(
+  discountType: "PERCENTAGE" | "FIXED",
+  discountValue: number,
+  subtotal: number,
+  maxDiscount: number | null
+): number {
+  let discount: number;
+
+  if (discountType === "PERCENTAGE") {
+    discount = (subtotal * discountValue) / 100;
+    if (maxDiscount !== null && discount > maxDiscount) {
+      discount = maxDiscount;
+    }
+  } else {
+    discount = discountValue;
+  }
+
+  return Math.min(discount, subtotal);
 }
 
 export async function GET(req: Request) {
@@ -36,7 +62,7 @@ export async function POST(req: Request) {
     const dbUser = await getCurrentDbUser(req);
     if (!dbUser) return Response.json({ message: "Unauthorized" }, { status: 401 });
 
-    const { addressId, paymentMethod } = await req.json();
+    const { addressId, paymentMethod, couponCode, bankOfferId } = await req.json();
     if (!addressId) return Response.json({ message: "Address required" }, { status: 400 });
 
     const address = await prisma.address.findFirst({
@@ -64,13 +90,123 @@ export async function POST(req: Request) {
       computedSubtotal += Number(item.product.salePrice) * item.quantity;
     }
 
+    // ─── Coupon Validation (server-side, never trust frontend) ────────────
+    let couponDiscount = 0;
+    let couponCodeSnapshot: string | null = null;
+    let validatedCouponId: string | null = null;
+
+    if (couponCode) {
+      const coupon = await prisma.coupon.findUnique({
+        where: { code: couponCode.toUpperCase().trim() },
+      });
+
+      if (!coupon) {
+        return Response.json({ message: "Invalid coupon code" }, { status: 400 });
+      }
+
+      if (!coupon.isActive) {
+        return Response.json({ message: "This coupon is no longer active" }, { status: 400 });
+      }
+
+      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+        return Response.json({ message: "This coupon has expired" }, { status: 400 });
+      }
+
+      let applicableSubtotal = computedSubtotal;
+      if (coupon.categoryId) {
+        applicableSubtotal = cartItems
+          .filter((item) => item.product.categoryId === coupon.categoryId)
+          .reduce((sum, item) => sum + Number(item.product.salePrice) * item.quantity, 0);
+
+        if (applicableSubtotal === 0) {
+          return Response.json(
+            { message: "This coupon is only valid for items in a specific category" },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (applicableSubtotal < Number(coupon.minOrderAmount)) {
+        return Response.json(
+          { message: `Minimum order amount of ₹${Number(coupon.minOrderAmount)} required for the applicable category items` },
+          { status: 400 }
+        );
+      }
+
+      if (coupon.totalUsageLimit !== null && coupon.usageCount >= coupon.totalUsageLimit) {
+        return Response.json({ message: "This coupon has reached its usage limit" }, { status: 400 });
+      }
+
+      const userUsageCount = await prisma.couponUsage.count({
+        where: { couponId: coupon.id, userId: dbUser.id },
+      });
+
+      if (userUsageCount >= coupon.perUserLimit) {
+        return Response.json(
+          { message: "You have already used this coupon the maximum number of times" },
+          { status: 400 }
+        );
+      }
+
+      couponDiscount = calculateDiscount(
+        coupon.discountType,
+        Number(coupon.discountValue),
+        applicableSubtotal,
+        coupon.maxDiscount ? Number(coupon.maxDiscount) : null
+      );
+      couponCodeSnapshot = coupon.code;
+      validatedCouponId = coupon.id;
+    }
+
+    // ─── Bank Offer Validation ────────────────────────────────────────────
+    let bankOfferDiscount = 0;
+    let bankOfferNameSnapshot: string | null = null;
+
+    if (bankOfferId) {
+      const bankOffer = await prisma.bankOffer.findUnique({
+        where: { id: bankOfferId },
+      });
+
+      if (bankOffer && bankOffer.isActive) {
+        const notExpired = !bankOffer.expiresAt || new Date(bankOffer.expiresAt) >= new Date();
+
+        let applicableSubtotal = computedSubtotal;
+        if (bankOffer.categoryId) {
+          applicableSubtotal = cartItems
+            .filter((item) => item.product.categoryId === bankOffer.categoryId)
+            .reduce((sum, item) => sum + Number(item.product.salePrice) * item.quantity, 0);
+        }
+
+        const meetsMinimum = applicableSubtotal > 0 && applicableSubtotal >= Number(bankOffer.minOrderAmount);
+
+        if (notExpired && meetsMinimum) {
+          bankOfferDiscount = calculateDiscount(
+            bankOffer.discountType,
+            Number(bankOffer.discountValue),
+            applicableSubtotal,
+            bankOffer.maxDiscount ? Number(bankOffer.maxDiscount) : null
+          );
+          bankOfferNameSnapshot = `${bankOffer.bankName}${bankOffer.cardType ? ` (${bankOffer.cardType})` : ""}`;
+        }
+      }
+      // Bank offer failures are soft — we don't block the order
+    }
+
+    // ─── Compute Final Amounts ────────────────────────────────────────────
     const shippingFee = computedSubtotal > 1000 ? 0 : 99;
-    const discountAmount = 0;
-    const computedTotal = computedSubtotal + shippingFee - discountAmount;
-    // const computedTotal = 60;
+    const totalDiscount = couponDiscount + bankOfferDiscount;
+    const discountAmount = Math.round(totalDiscount * 100) / 100;
+    const computedTotal = Math.max(computedSubtotal + shippingFee - discountAmount, 0);
 
     const orderNumber = generateOrderNumber(dbUser.id);
     const isCod = paymentMethod === "COD";
+
+    if (bankOfferId && isCod) {
+      return Response.json(
+        { message: "Bank offers require online payment. COD is not available for this order." },
+        { status: 400 }
+      );
+    }
 
     const order = await prisma.$transaction(async (tx) => {
       // 🔄 RETRY PROTECTION RULE: Look for an existing, unfulfilled PENDING order session
@@ -88,8 +224,11 @@ export async function POST(req: Request) {
           where: { orderId: existingPendingOrder.id }
         });
 
-        // Update existing row metrics. 
-        // Note: Resetting stripePaymentIntentId to null so the upcoming intent generation puts a fresh token on it.
+        // Also clean up any stale coupon usage from the previous attempt
+        await tx.couponUsage.deleteMany({
+          where: { orderId: existingPendingOrder.id }
+        });
+
         const updatedOrder = await tx.order.update({
           where: { id: existingPendingOrder.id },
           data: {
@@ -97,6 +236,10 @@ export async function POST(req: Request) {
             shippingFee,
             discountAmount,
             totalAmount: computedTotal,
+            couponCode: couponCodeSnapshot,
+            couponDiscount,
+            bankOfferName: bankOfferNameSnapshot,
+            bankOfferDiscount,
             status: isCod ? "CONFIRMED" : "PENDING",
             stripePaymentIntentId: null,
             shippingName: address.fullName,
@@ -128,6 +271,32 @@ export async function POST(req: Request) {
           }
         });
 
+        // Record coupon usage
+        if (validatedCouponId) {
+          await tx.couponUsage.create({
+            data: {
+              couponId: validatedCouponId,
+              userId: dbUser.id,
+              orderId: updatedOrder.id,
+            },
+          });
+          await tx.coupon.update({
+            where: { id: validatedCouponId },
+            data: { usageCount: { increment: 1 } },
+          });
+        }
+
+        // Log timeline event
+        await appendOrderEvent(tx, {
+          orderId: updatedOrder.id,
+          status: "PENDING",
+        });
+        await notifyOrderStatusChange(tx, {
+          userId: dbUser.id,
+          orderId: updatedOrder.id,
+          status: "PENDING",
+        });
+
         if (isCod) {
           await tx.cart.deleteMany({ where: { userId: dbUser.id } });
           for (const item of cartItems) {
@@ -136,6 +305,15 @@ export async function POST(req: Request) {
               data: { stock: { decrement: item.quantity } },
             });
           }
+          await appendOrderEvent(tx, {
+            orderId: updatedOrder.id,
+            status: "CONFIRMED",
+          });
+          await notifyOrderStatusChange(tx, {
+            userId: dbUser.id,
+            orderId: updatedOrder.id,
+            status: "CONFIRMED",
+          });
         }
 
         return updatedOrder;
@@ -150,6 +328,10 @@ export async function POST(req: Request) {
           shippingFee,
           discountAmount,
           totalAmount: computedTotal,
+          couponCode: couponCodeSnapshot,
+          couponDiscount,
+          bankOfferName: bankOfferNameSnapshot,
+          bankOfferDiscount,
           status: isCod ? "CONFIRMED" : "PENDING",
           paymentStatus: "PENDING",
           shippingName: address.fullName,
@@ -181,6 +363,32 @@ export async function POST(req: Request) {
         },
       });
 
+      // Record coupon usage
+      if (validatedCouponId) {
+        await tx.couponUsage.create({
+          data: {
+            couponId: validatedCouponId,
+            userId: dbUser.id,
+            orderId: newOrder.id,
+          },
+        });
+        await tx.coupon.update({
+          where: { id: validatedCouponId },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+
+      // Log timeline event
+      await appendOrderEvent(tx, {
+        orderId: newOrder.id,
+        status: "PENDING",
+      });
+      await notifyOrderStatusChange(tx, {
+        userId: dbUser.id,
+        orderId: newOrder.id,
+        status: "PENDING",
+      });
+
       if (isCod) {
         await tx.cart.deleteMany({ where: { userId: dbUser.id } });
         for (const item of cartItems) {
@@ -189,6 +397,15 @@ export async function POST(req: Request) {
             data: { stock: { decrement: item.quantity } },
           });
         }
+        await appendOrderEvent(tx, {
+          orderId: newOrder.id,
+          status: "CONFIRMED",
+        });
+        await notifyOrderStatusChange(tx, {
+          userId: dbUser.id,
+          orderId: newOrder.id,
+          status: "CONFIRMED",
+        });
       }
 
       return newOrder;
@@ -198,6 +415,9 @@ export async function POST(req: Request) {
       orderId: order.id,
       orderNumber: order.orderNumber,
       amount: Number(order.totalAmount),
+      couponDiscount: Number(order.couponDiscount),
+      bankOfferDiscount: Number(order.bankOfferDiscount),
+      totalDiscount: Number(order.discountAmount),
     });
   } catch (error) {
     console.error("POST Order Creation Error:", error);
@@ -230,18 +450,47 @@ export async function PATCH(req: Request) {
       return Response.json({ message: "Order payment status is already marked as success." }, { status: 200 });
     }
 
-    await prisma.$transaction([
-      prisma.order.update({
+    await prisma.$transaction(async (tx) => {
+      // 1. Fetch order items
+      const orderRecord = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+
+      if (!orderRecord) {
+        throw new Error("Order not found");
+      }
+
+      // 2. Decrement stock
+      await reserveOrderInventory(tx, orderRecord.items);
+
+      // 3. Mark as paid
+      await tx.order.update({
         where: { id: orderId },
         data: {
           paymentStatus: "PAID",
           status: "CONFIRMED",
         },
-      }),
-      prisma.cart.deleteMany({
+      });
+
+      // 4. Clear cart
+      await tx.cart.deleteMany({
         where: { userId: dbUser.id },
-      }),
-    ]);
+      });
+
+      // 5. Append timeline event
+      await appendOrderEvent(tx, {
+        orderId,
+        status: "CONFIRMED",
+      });
+
+      // 6. Notify user
+      await notifyOrderStatusChange(tx, {
+        userId: dbUser.id,
+        orderId,
+        status: "CONFIRMED",
+      });
+    });
 
     return Response.json({
       message: "Payment verified and order finalized successfully.",
@@ -253,4 +502,3 @@ export async function PATCH(req: Request) {
     return Response.json({ message: "Failed to update order payment parameters" }, { status: 500 });
   }
 }
-

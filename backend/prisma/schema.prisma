@@ -15,11 +15,17 @@ enum Role {
   USER
   STAFF
   ADMIN
+  DELIVERY_AGENT
 }
 
 enum DiscountType {
   PERCENTAGE
   FIXED
+}
+
+enum PaymentMethod {
+  ONLINE
+  COD
 }
 
 model User {
@@ -37,8 +43,11 @@ model User {
   carts        Cart[]
   addresses    Address[]
   orders       Order[]
+  deliveryOrders Order[] @relation("DeliveryAgentOrders")
   reviews      Review[]
   couponUsages CouponUsage[]
+  notifications Notification[]
+  notificationPreference NotificationPreference?
 
   @@index([clerkId])
   @@index([email])
@@ -71,15 +80,15 @@ model Address {
 }
 
 model Category {
-  id          String    @id @default(uuid())
+  id          String      @id @default(uuid())
   name        String
-  slug        String    @unique
+  slug        String      @unique
   imageUrl    String?
   description String?
-  isActive    Boolean   @default(true)
-  isDeleted   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isActive    Boolean     @default(true)
+  isDeleted   Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
   products    Product[]
   coupons     Coupon[]
   bankOffers  BankOffer[]
@@ -194,11 +203,21 @@ model Cart {
   @@map("carts")
 }
 
+enum DeliveryStatus {
+  ASSIGNED
+  ACCEPTED
+  PICKED_UP
+  OUT_FOR_DELIVERY
+  DELIVERED
+}
+
 enum OrderStatus {
   PENDING
   CONFIRMED
   PROCESSING
+  PACKED
   SHIPPED
+  OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
   REFUNDED
@@ -211,6 +230,20 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum NotificationType {
+  ORDER_PLACED
+  ORDER_CONFIRMED
+  ORDER_PACKED
+  ORDER_SHIPPED
+  ORDER_OUT_FOR_DELIVERY
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  PROMOTIONS_OFFERS
+  COUPONS
+  BANK_OFFERS
+  NEW_ARRIVALS
+}
+
 model Order {
   id          String @id @default(uuid())
   userId      String
@@ -218,7 +251,7 @@ model Order {
 
   status                OrderStatus   @default(PENDING)
   paymentStatus         PaymentStatus @default(PENDING)
-  paymentMethod         String?
+  paymentMethod         PaymentMethod @default(ONLINE)
   stripePaymentIntentId String?
 
   currency String @default("INR")
@@ -248,15 +281,90 @@ model Order {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  cancelledAt DateTime?
+  cancelReason String?
+
+  // Delivery details
+  deliveryStatus           DeliveryStatus?
+  deliveryAgentId          String?
+  deliveryAgent            User?           @relation("DeliveryAgentOrders", fields: [deliveryAgentId], references: [id], onDelete: SetNull)
+  deliveryOtpHash          String?
+  deliveryOtpExpiresAt     DateTime?
+
+  // Delivery timestamps
+  deliveryAssignedAt       DateTime?
+  deliveryAcceptedAt       DateTime?
+  deliveryPickedUpAt       DateTime?
+  deliveryOutForDeliveryAt DateTime?
+  deliveryDeliveredAt      DateTime?
 
   items        OrderItem[]
   couponUsages CouponUsage[]
+  events       OrderEvent[]
+  notifications Notification[]
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([orderNumber])
   @@index([status])
+  @@index([deliveryAgentId])
+  @@index([deliveryStatus])
   @@map("orders")
+}
+
+model OrderEvent {
+  id          String      @id @default(uuid())
+  orderId     String
+  status      OrderStatus
+  title       String
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@map("order_events")
+}
+
+model NotificationPreference {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  orderUpdates     Boolean  @default(true)
+  promotionsOffers Boolean  @default(true)
+  coupons          Boolean  @default(true)
+  bankOffers       Boolean  @default(true)
+  newArrivals      Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+model Notification {
+  id        String            @id @default(uuid())
+  userId    String
+  orderId   String?
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([readAt])
+  @@index([type])
+  @@map("notifications")
 }
 
 model OrderItem {
@@ -346,8 +454,8 @@ model Coupon {
 
   usages CouponUsage[]
 
-  categoryId      String?
-  category        Category?    @relation(fields: [categoryId], references: [id])
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
 
   @@index([code])
   @@index([isActive])
@@ -388,8 +496,8 @@ model BankOffer {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  categoryId     String?
-  category       Category?    @relation(fields: [categoryId], references: [id])
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
 
   @@index([isActive])
   @@index([bankName])

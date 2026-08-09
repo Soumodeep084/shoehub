@@ -18,6 +18,12 @@ import { useStripe } from "@stripe/stripe-react-native";
 import { useCartStore } from "@/store/cartStore";
 import { useOrderStore } from "@/store/orderStore";
 import { useAddressStore } from "@/store/addressStore";
+import { useCouponStore } from "@/store/couponStore";
+
+// Components
+import CouponInput from "@/components/checkout/CouponInput";
+import BankOffersList from "@/components/checkout/BankOffersList";
+import AvailableCouponsList from "@/components/checkout/AvailableCouponsList";
 
 // Utils
 import { formatPrice } from "@/utils/price.utils";
@@ -39,6 +45,13 @@ export default function CheckoutScreen() {
     isLoading: isAddressesLoading,
     fetchAddresses,
   } = useAddressStore();
+  const {
+    appliedCoupon,
+    selectedBankOffer,
+    fetchCoupons,
+    fetchBankOffers,
+    clearAll: clearCouponState,
+  } = useCouponStore();
 
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
     null,
@@ -51,8 +64,25 @@ export default function CheckoutScreen() {
 
   const subtotal = getCartTotal();
   const shippingFee = subtotal > 1000 ? 0 : 99;
-  const discount = 0;
-  const totalAmount = subtotal + shippingFee - discount;
+
+  // Discount values from server (via coupon store)
+  const couponDiscount = appliedCoupon?.discount ?? 0;
+
+  // Bank offer discount is computed display-only (server recalculates at order time)
+  const bankOfferDiscount = (() => {
+    if (!selectedBankOffer) return 0;
+    if (subtotal < selectedBankOffer.minOrderAmount) return 0;
+    if (selectedBankOffer.discountType === "PERCENTAGE") {
+      let d = (subtotal * selectedBankOffer.discountValue) / 100;
+      if (selectedBankOffer.maxDiscount && d > selectedBankOffer.maxDiscount)
+        d = selectedBankOffer.maxDiscount;
+      return Math.round(d);
+    }
+    return Math.min(selectedBankOffer.discountValue, subtotal);
+  })();
+
+  const totalDiscount = couponDiscount + bankOfferDiscount;
+  const totalAmount = Math.max(subtotal + shippingFee - totalDiscount, 0);
 
   useEffect(() => {
     let mounted = true;
@@ -61,7 +91,11 @@ export default function CheckoutScreen() {
       const token = await getToken();
 
       if (mounted && token) {
-        await fetchAddresses(token);
+        await Promise.all([
+          fetchAddresses(token),
+          fetchCoupons(token),
+          fetchBankOffers(token),
+        ]);
       }
     };
 
@@ -79,6 +113,12 @@ export default function CheckoutScreen() {
       setSelectedAddressId(defaultAddr.id);
     }
   }, [addresses, selectedAddressId]);
+
+  useEffect(() => {
+    if (selectedBankOffer) {
+      setPaymentMethod("ONLINE");
+    }
+  }, [selectedBankOffer]);
 
   const handleProceedToPayment = async () => {
     if (!selectedAddressId) {
@@ -104,6 +144,8 @@ export default function CheckoutScreen() {
           token,
           selectedAddressId,
           paymentMethod,
+          appliedCoupon?.coupon.code ?? null,
+          selectedBankOffer?.id ?? null,
         );
         if (!orderData?.orderId)
           throw new Error("Order setup processing failed");
@@ -114,6 +156,7 @@ export default function CheckoutScreen() {
       // ─── BRANCH A: CASH ON DELIVERY (COD) ──────────────────────────────
       if (paymentMethod === "COD") {
         clearCart();
+        clearCouponState();
         fetchOrders(token); // Refresh local orders cache to reflect new order in history
         setActiveOrderId(null);
         setIsProcessing(false);
@@ -160,6 +203,7 @@ export default function CheckoutScreen() {
       await updateOrderPaymentStatus(token, orderId);
 
       clearCart();
+      clearCouponState();
       fetchOrders(token);
       setActiveOrderId(null);
 
@@ -250,11 +294,10 @@ export default function CheckoutScreen() {
                     key={address.id}
                     onPress={() => setSelectedAddressId(address.id)}
                     activeOpacity={0.8}
-                    className={`p-4 rounded-2xl border mb-3 ${
-                      isSelected
+                    className={`p-4 rounded-2xl border mb-3 ${isSelected
                         ? "bg-zinc-100 border-zinc-900"
                         : "bg-white border-zinc-200"
-                    }`}
+                      }`}
                   >
                     <View className="flex-row items-center justify-between">
                       <View className="flex-row items-center space-x-2">
@@ -270,11 +313,10 @@ export default function CheckoutScreen() {
                         )}
                       </View>
                       <View
-                        className={`w-5 h-5 rounded-full border items-center justify-center ${
-                          isSelected
+                        className={`w-5 h-5 rounded-full border items-center justify-center ${isSelected
                             ? "border-zinc-900 bg-zinc-900"
                             : "border-zinc-300 bg-white"
-                        }`}
+                          }`}
                       >
                         {isSelected && (
                           <Ionicons
@@ -303,21 +345,53 @@ export default function CheckoutScreen() {
           )}
         </View>
 
+        {/* COUPON INPUT */}
+        <View className="mt-6 px-4">
+          <Text className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">
+            Apply Coupon
+          </Text>
+          <CouponInput
+            subtotal={subtotal}
+          />
+        </View>
+
+        {/* AVAILABLE COUPONS LIST */}
+        <View className="mt-4 px-4">
+          <AvailableCouponsList
+            subtotal={subtotal}
+          />
+        </View>
+
+        {/* BANK OFFERS */}
+        <View className="mt-6 px-4">
+          <BankOffersList subtotal={subtotal} />
+        </View>
+
         {/* PAYMENT METHOD SELECTOR BOXES */}
         <View className="mt-6 px-4">
           <Text className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-3">
             Select Payment Method
           </Text>
 
+          {selectedBankOffer && (
+            <View className="mb-3 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+              <Text className="text-xs font-bold uppercase tracking-wide text-cyan-800">
+                Online payment required
+              </Text>
+              <Text className="text-xs text-cyan-700 mt-1">
+                Bank offers can only be used with online payment. COD is disabled while this offer is selected.
+              </Text>
+            </View>
+          )}
+
           {/* ONLINE OPTION CARD */}
           <TouchableOpacity
             onPress={() => setPaymentMethod("ONLINE")}
             activeOpacity={0.8}
-            className={`p-4 rounded-2xl border flex-row items-center mb-3 ${
-              paymentMethod === "ONLINE"
+            className={`p-4 rounded-2xl border flex-row items-center mb-3 ${paymentMethod === "ONLINE"
                 ? "bg-zinc-100 border-zinc-900"
                 : "bg-white border-zinc-200"
-            }`}
+              }`}
           >
             <View className="p-2 bg-zinc-200 rounded-xl mr-4">
               <Ionicons name="card" size={22} color="#18181b" />
@@ -331,11 +405,10 @@ export default function CheckoutScreen() {
               </Text>
             </View>
             <View
-              className={`w-5 h-5 rounded-full border items-center justify-center ${
-                paymentMethod === "ONLINE"
+              className={`w-5 h-5 rounded-full border items-center justify-center ${paymentMethod === "ONLINE"
                   ? "border-zinc-900 bg-zinc-900"
                   : "border-zinc-300 bg-white"
-              }`}
+                }`}
             >
               {paymentMethod === "ONLINE" && (
                 <View className="w-2 h-2 rounded-full bg-white" />
@@ -345,13 +418,19 @@ export default function CheckoutScreen() {
 
           {/* COD OPTION CARD */}
           <TouchableOpacity
-            onPress={() => setPaymentMethod("COD")}
+            onPress={() => {
+              if (!selectedBankOffer) {
+                setPaymentMethod("COD");
+              }
+            }}
             activeOpacity={0.8}
-            className={`p-4 rounded-2xl border flex-row items-center ${
-              paymentMethod === "COD"
-                ? "bg-zinc-100 border-zinc-900"
-                : "bg-white border-zinc-200"
-            }`}
+            disabled={!!selectedBankOffer}
+            className={`p-4 rounded-2xl border flex-row items-center ${selectedBankOffer
+                ? "bg-zinc-100 border-zinc-200 opacity-50"
+                : paymentMethod === "COD"
+                  ? "bg-zinc-100 border-zinc-900"
+                  : "bg-white border-zinc-200"
+              }`}
           >
             <View className="p-2 bg-zinc-200 rounded-xl mr-4">
               <Ionicons name="cash" size={22} color="#18181b" />
@@ -361,17 +440,20 @@ export default function CheckoutScreen() {
                 Cash on Delivery (COD)
               </Text>
               <Text className="text-xs text-zinc-500 mt-0.5">
-                Pay via cash or UPI when items are delivered
+                {selectedBankOffer
+                  ? "Disabled for bank offer orders"
+                  : "Pay via cash or UPI when items are delivered"}
               </Text>
             </View>
             <View
-              className={`w-5 h-5 rounded-full border items-center justify-center ${
-                paymentMethod === "COD"
-                  ? "border-zinc-900 bg-zinc-900"
-                  : "border-zinc-300 bg-white"
-              }`}
+              className={`w-5 h-5 rounded-full border items-center justify-center ${selectedBankOffer
+                  ? "border-zinc-300 bg-zinc-200"
+                  : paymentMethod === "COD"
+                    ? "border-zinc-900 bg-zinc-900"
+                    : "border-zinc-300 bg-white"
+                }`}
             >
-              {paymentMethod === "COD" && (
+              {paymentMethod === "COD" && !selectedBankOffer && (
                 <View className="w-2 h-2 rounded-full bg-white" />
               )}
             </View>
@@ -387,11 +469,10 @@ export default function CheckoutScreen() {
             {items.slice(0, 3).map((item, index) => (
               <View
                 key={item.variantId}
-                className={`flex-row py-3 ${
-                  index !== Math.min(items.length, 3) - 1
+                className={`flex-row py-3 ${index !== Math.min(items.length, 3) - 1
                     ? "border-b border-zinc-100"
                     : ""
-                }`}
+                  }`}
               >
                 <Image
                   source={{ uri: item.imageUrl }}
@@ -446,6 +527,46 @@ export default function CheckoutScreen() {
                 {shippingFee === 0 ? "FREE" : formatPrice(shippingFee)}
               </Text>
             </View>
+
+            {/* Coupon Discount */}
+            {couponDiscount > 0 && (
+              <View className="flex-row justify-between mb-2.5">
+                <Text className="text-xs font-semibold text-emerald-600">
+                  Coupon ({appliedCoupon?.coupon.code})
+                </Text>
+                <Text className="text-xs font-bold text-emerald-600">
+                  -{formatPrice(couponDiscount)}
+                </Text>
+              </View>
+            )}
+
+            {/* Bank Offer Discount */}
+            {bankOfferDiscount > 0 && selectedBankOffer && (
+              <View className="flex-row justify-between mb-2.5">
+                <Text className="text-xs font-semibold text-cyan-600">
+                  {selectedBankOffer.bankName} Offer
+                </Text>
+                <Text className="text-xs font-bold text-cyan-600">
+                  -{formatPrice(bankOfferDiscount)}
+                </Text>
+              </View>
+            )}
+
+            {/* Total Savings */}
+            {totalDiscount > 0 && (
+              <>
+                <View className="h-[1px] bg-zinc-100 my-2" />
+                <View className="flex-row justify-between mb-2.5">
+                  <Text className="text-xs font-bold text-emerald-600">
+                    Total Savings
+                  </Text>
+                  <Text className="text-xs font-black text-emerald-600">
+                    -{formatPrice(totalDiscount)}
+                  </Text>
+                </View>
+              </>
+            )}
+
             <View className="h-[1px] bg-zinc-100 my-3" />
             <View className="flex-row justify-between items-center">
               <Text className="text-sm font-black text-zinc-900">
@@ -469,15 +590,19 @@ export default function CheckoutScreen() {
             <Text className="text-xl font-black text-zinc-950">
               {formatPrice(totalAmount)}
             </Text>
+            {totalDiscount > 0 && (
+              <Text className="text-[10px] font-bold text-emerald-600">
+                You save {formatPrice(totalDiscount)}
+              </Text>
+            )}
           </View>
 
           <TouchableOpacity
             activeOpacity={0.8}
             disabled={!selectedAddressId || isProcessing || items.length === 0}
             onPress={handleProceedToPayment}
-            className={`h-12 px-6 rounded-xl flex-row items-center justify-center ${
-              !selectedAddressId || isProcessing ? "bg-zinc-200" : "bg-zinc-950"
-            }`}
+            className={`h-12 px-6 rounded-xl flex-row items-center justify-center ${!selectedAddressId || isProcessing ? "bg-zinc-200" : "bg-zinc-950"
+              }`}
           >
             {isProcessing ? (
               <ActivityIndicator color="#ffffff" size="small" />

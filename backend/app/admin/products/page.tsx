@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { getProducts, getCategories } from "@/lib/adminActions/product-actions";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/admin/dashboard/page-header";
+import { ExportButtons } from "@/components/admin/dashboard/export-buttons";
 import { ProductFilters } from "@/components/admin/products/product-filters";
 import { ProductsTable } from "@/components/admin/products/products-table";
 
@@ -43,6 +44,16 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         description="Manage shoe catalogue, inventory stocks, prices, and features."
       >
         <div className="flex gap-2">
+          <ExportButtons
+            entity="products"
+            params={{
+              search: params.search,
+              categoryId: params.categoryId,
+              status: params.status,
+              sortBy,
+              sortOrder,
+            }}
+          />
           <Button variant="outline" size="sm" asChild className="h-9">
             <Link
               href="/admin/products/trash"

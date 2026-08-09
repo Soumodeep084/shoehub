@@ -143,6 +143,10 @@ export interface Order {
 	shippingFee: string;
 	discountAmount: string;
 	totalAmount: string;
+	couponCode: string | null;
+	couponDiscount: string;
+	bankOfferName: string | null;
+	bankOfferDiscount: string;
 	shippingName: string;
 	shippingPhone: string;
 	shippingLine1: string;
@@ -156,6 +160,50 @@ export interface Order {
 	updatedAt: string;
 	items: OrderItem[];
 	itemCount?: number;
+	events?: OrderEvent[];
+	cancelledAt?: string | null;
+	cancelReason?: string | null;
+}
+
+export type DiscountType = "PERCENTAGE" | "FIXED";
+
+export interface Coupon {
+	id: string;
+	code: string;
+	description: string | null;
+	discountType: DiscountType;
+	discountValue: number;
+	minOrderAmount: number;
+	maxDiscount: number | null;
+	expiresAt: string | null;
+}
+
+export interface AppliedCoupon {
+	coupon: Coupon;
+	discount: number;
+	subtotal: number;
+	newTotal: number;
+}
+
+export interface BankOffer {
+	id: string;
+	bankName: string;
+	cardType: string | null;
+	description: string;
+	discountType: DiscountType;
+	discountValue: number;
+	minOrderAmount: number;
+	maxDiscount: number | null;
+	expiresAt: string | null;
+}
+
+export interface CouponValidationResponse {
+	valid: boolean;
+	message?: string;
+	coupon?: Coupon;
+	discount?: number;
+	subtotal?: number;
+	newTotal?: number;
 }
 
 export type ReviewMediaType = "IMAGE" | "VIDEO";
@@ -220,5 +268,53 @@ export type SessionItem = {
 	};
 
 	revoke: () => Promise<any>;
+}
+
+export interface OrderEvent {
+	id: string;
+	orderId: string;
+	status: OrderStatus;
+	title: string;
+	description: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export type NotificationType =
+  | "ORDER_PLACED"
+  | "ORDER_CONFIRMED"
+  | "ORDER_PACKED"
+  | "ORDER_SHIPPED"
+  | "ORDER_OUT_FOR_DELIVERY"
+  | "ORDER_DELIVERED"
+  | "ORDER_CANCELLED"
+  | "PROMOTIONS_OFFERS"
+  | "COUPONS"
+  | "BANK_OFFERS"
+  | "NEW_ARRIVALS";
+
+export interface Notification {
+	id: string;
+	userId: string;
+	orderId: string | null;
+	type: NotificationType;
+	title: string;
+	body: string;
+	data: any;
+	readAt: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface NotificationPreference {
+	id: string;
+	userId: string;
+	orderUpdates: boolean;
+	promotionsOffers: boolean;
+	coupons: boolean;
+	bankOffers: boolean;
+	newArrivals: boolean;
+	createdAt: string;
+	updatedAt: string;
 }
 

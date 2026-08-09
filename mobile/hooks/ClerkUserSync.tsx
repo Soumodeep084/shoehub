@@ -5,8 +5,10 @@ import { useAddressStore } from "@/store/addressStore";
 import { useOrderStore } from "@/store/orderStore";
 import { useCartStore } from "@/store/cartStore";
 import { useWishlistStore } from "@/store/wishlistStore";
+import { usePushNotifications } from "./usePushNotifications";
 
 export default function ClerkUserSync() {
+  usePushNotifications();
   const { user, isSignedIn } = useUser();
 
   const setUser = useUserStore((state) => state.setUser);

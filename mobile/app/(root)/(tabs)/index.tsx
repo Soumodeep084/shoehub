@@ -150,13 +150,7 @@ export default function HomeScreen() {
     };
 
     loadInitialData();
-  }, [
-    fetchBrands,
-    fetchCategories,
-    fetchFeatured,
-    fetchNewArrivals,
-    fetchTrending,
-  ]);
+  }, []);
 
   // --- FILTER LISTENER (Runs every time the user taps a chip) ---
   useEffect(() => {
@@ -177,9 +171,6 @@ export default function HomeScreen() {
   }, [
     selectedCategoryId,
     selectedBrand,
-    fetchNewArrivals,
-    fetchTrending,
-    fetchFeatured,
   ]);
 
   // --- GESTURE PULL-TO-REFRESH HANDLER ---
@@ -261,6 +252,7 @@ export default function HomeScreen() {
               onSearchPress={() => router.push("/search")}
               onWishlistPress={() => router.push("/wishlist")}
               onAvatarPress={() => router.push("/profile")}
+              onNotificationPress={() => router.push("/notifications" as any)}
             />
           </View>
 

@@ -10,12 +10,26 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Linking from "expo-linking";
 
 type ResetStep = "email" | "code" | "password";
 
 export default function SignIn() {
-  const { signIn, errors, fetchStatus } = useSignIn();
+  const { signIn, fetchStatus } = useSignIn();
   const router = useRouter();
+
+  const finalizeSignIn = async () => {
+    await signIn.finalize({
+      navigate: ({ session, decorateUrl }) => {
+        if (session?.currentTask) {
+          console.log(session.currentTask);
+          return;
+        }
+
+        router.replace(decorateUrl("/") as any);
+      },
+    });
+  };
 
   const [mode, setMode] = useState<"signIn" | "reset">("signIn");
   const [resetStep, setResetStep] = useState<ResetStep>("email");
@@ -26,6 +40,7 @@ export default function SignIn() {
   const [resetMessage, setResetMessage] = useState("");
   const [resetError, setResetError] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
+  const [showSupportMessage, setShowSupportMessage] = useState(false);
   const [signInError, setSignInError] = useState("");
 
   const [showEmailVerification, setShowEmailVerification] = useState(false);
@@ -34,36 +49,55 @@ export default function SignIn() {
   const [verificationCode, setVerificationCode] = useState("");
   const [verificationError, setVerificationError] = useState("");
 
-  const onSignInPress = async () => {
-    setSignInError(""); // Clears old errors when you try again
+  const subject = encodeURIComponent("Request for Account Ban Review");
 
+  const body = encodeURIComponent(`Dear ShoeHub Support Team,
+
+I am unable to access my ShoeHub account because it has been banned.
+
+I believe this may have been an error and would appreciate it if you could review my account. If any additional information or verification is required, please let me know and I will be happy to provide it.
+
+Account Email: ${email}
+
+Thank you for your time and assistance. I look forward to your response.
+
+Kind regards,
+`);
+
+  const onSignInPress = async () => {
+    setSignInError("");
+    setShowSupportMessage(false);
     try {
+      if (!email.trim()) {
+        setSignInError("Please enter your email.");
+        return;
+      }
+
+      if (!password.trim()) {
+        setSignInError("Please enter your password.");
+        return;
+      }
+
+      if (isLoading) return;
+
       const { error } = await signIn.password({
         emailAddress: email,
         password,
       });
 
+      if (
+        error?.message?.toLowerCase().includes("banned") ||
+        error?.message?.toLowerCase().includes("locked")
+      ) {
+        setShowSupportMessage(true);
+      }
       if (error) {
         setSignInError(error.message);
         return;
       }
 
-      console.log(
-        "Password sign-in successful, checking status...",
-        signIn.status,
-      );
-
       if (signIn.status === "complete") {
-        await signIn.finalize({
-          navigate: ({ session, decorateUrl }) => {
-            if (session?.currentTask) {
-              console.log(session?.currentTask);
-              return;
-            }
-            const url = decorateUrl("/");
-            router.replace(url as any);
-          },
-        });
+        await finalizeSignIn();
       } else if (signIn.status === "needs_second_factor") {
         const emailFactor = signIn.supportedSecondFactors.find(
           (factor) => factor.strategy === "email_code",
@@ -72,8 +106,6 @@ export default function SignIn() {
         if (emailFactor) {
           await signIn.mfa.sendEmailCode();
           setShowEmailVerification(true);
-          console.log("Email code sent");
-          console.log(signIn.mfa);
         }
       } else if (signIn.status === "needs_client_trust") {
         const emailCodeFactor = signIn.supportedSecondFactors.find(
@@ -83,13 +115,11 @@ export default function SignIn() {
         if (emailCodeFactor) {
           await signIn.mfa.sendEmailCode();
           setShowEmailVerification(true);
-          console.log("Email code sent");
         }
       } else {
         console.error("Sign-In attempt not complete : \n", signIn);
       }
     } catch (err: any) {
-      // 🚨 THIS IS WHAT YOU WERE MISSING!
       // When Clerk rejects the login, it jumps down here.
       console.error("Sign in error:", JSON.stringify(err, null, 2));
 
@@ -102,6 +132,8 @@ export default function SignIn() {
   };
 
   const startResetPassword = async () => {
+    if (resetLoading) return;
+
     if (!email.trim()) {
       setResetError("Enter your email address first.");
       return;
@@ -132,6 +164,7 @@ export default function SignIn() {
   };
 
   const verifyResetCode = async () => {
+    if (resetLoading) return;
     if (!code.trim()) {
       setResetError("Enter the reset code sent to your email.");
       return;
@@ -158,6 +191,7 @@ export default function SignIn() {
   };
 
   const submitNewPassword = async () => {
+    if (resetLoading) return;
     if (!newPassword.trim()) {
       setResetError("Enter a new password.");
       return;
@@ -178,24 +212,44 @@ export default function SignIn() {
       }
 
       if (signIn.status === "complete") {
-        console.log("Sign in complete");
-        await signIn.finalize({
-          navigate: ({ session, decorateUrl }) => {
-            if (session?.currentTask) {
-              console.log(session.currentTask);
-              return;
-            }
-
-            const url = decorateUrl("/");
-            router.replace(url as any);
-          },
-        });
+        await finalizeSignIn();
         return;
       }
 
       setResetError("Password was updated, but sign-in is not complete.");
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const verifyEmailCode = async () => {
+    if (emailVerificationProcess) return;
+    try {
+      setEmailVerificationProcess(true);
+      setVerificationError("");
+
+      const { error } = await signIn.mfa.verifyEmailCode({
+        code: verificationCode.trim(),
+      });
+
+      if (error) {
+        setEmailVerificationProcess(false);
+        setVerificationCode("");
+        setVerificationError(error.message);
+        return;
+      }
+
+      if (signIn.status === "complete") {
+        setEmailVerificationProcess(false);
+        await finalizeSignIn();
+      }
+    } catch (err: any) {
+      setEmailVerificationProcess(false);
+      setVerificationError(
+        err?.errors?.[0]?.longMessage ||
+          err?.errors?.[0]?.message ||
+          "Invalid verification code",
+      );
     }
   };
 
@@ -218,44 +272,7 @@ export default function SignIn() {
   };
 
   const isLoading = fetchStatus === "fetching";
-  const verifyEmailCode = async () => {
-    try {
-      setEmailVerificationProcess(true);
-      setVerificationError("");
 
-      const { error } = await signIn.mfa.verifyEmailCode({
-        code: verificationCode.trim(),
-      });
-
-      if (error) {
-        setVerificationError(error.message);
-        return;
-      }
-
-      if (signIn.status === "complete") {
-        setEmailVerificationProcess(false);
-        await signIn.finalize({
-          navigate: ({ session, decorateUrl }) => {
-            if (session?.currentTask) {
-              console.log(session.currentTask);
-              return;
-            }
-
-            const url = decorateUrl("/");
-            router.replace(url as any);
-          },
-        });
-      }
-    } catch (err: any) {
-      console.log(err);
-
-      setVerificationError(
-        err?.errors?.[0]?.longMessage ||
-          err?.errors?.[0]?.message ||
-          "Invalid verification code",
-      );
-    }
-  };
   if (showEmailVerification) {
     return (
       <View className="flex-1 justify-center px-6 bg-stone-50">
@@ -272,7 +289,9 @@ export default function SignIn() {
 
         <TextInput
           value={verificationCode}
-          onChangeText={setVerificationCode}
+          onChangeText={(text) => {
+            setVerificationCode(text);
+          }}
           placeholder="Verification code"
           keyboardType="number-pad"
           className="w-full border border-gray-300 rounded-xl px-4 py-3 mb-4 bg-white"
@@ -284,12 +303,13 @@ export default function SignIn() {
 
         <TouchableOpacity
           onPress={verifyEmailCode}
+          disabled={emailVerificationProcess}
           className="bg-black py-4 rounded-xl items-center"
         >
           {emailVerificationProcess ? (
-            <Text className="text-white font-bold">Verify</Text>
-          ) : (
             <ActivityIndicator color="white" />
+          ) : (
+            <Text className="text-white font-bold">Verify</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -337,6 +357,8 @@ export default function SignIn() {
                 placeholder="Email address"
                 placeholderTextColor="#9CA3AF"
                 value={email}
+                autoComplete="email"
+                textContentType="emailAddress"
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -395,6 +417,8 @@ export default function SignIn() {
               <TextInput
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 mb-4 bg-white"
                 placeholder="New password"
+                autoComplete="password"
+                textContentType="newPassword"
                 placeholderTextColor="#9CA3AF"
                 value={newPassword}
                 onChangeText={setNewPassword}
@@ -448,33 +472,27 @@ export default function SignIn() {
           placeholder="Email address"
           placeholderTextColor="#9CA3AF"
           value={email}
+          autoComplete="email"
+          textContentType="emailAddress"
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        {errors.fields.identifier && (
-          <Text className="text-red-500 mb-4">
-            {errors.fields.identifier.message}
-          </Text>
-        )}
 
         <TextInput
           className="w-full border border-gray-300 rounded-xl px-4 py-3 mb-6"
           placeholder="Password"
           placeholderTextColor="#9CA3AF"
+          autoComplete="password"
+          textContentType="password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
         />
-        {errors.fields.password && (
-          <Text className="text-red-500 mb-4">
-            {errors.fields.password.message}
-          </Text>
-        )}
 
         <TouchableOpacity
           onPress={onSignInPress}
-          disabled={isLoading}
+          disabled={isLoading || !email.trim() || !password.trim()}
           className="w-full bg-black text-white py-4 rounded-xl items-center mb-4"
         >
           {isLoading ? (
@@ -502,6 +520,26 @@ export default function SignIn() {
             <Text className="text-gray-600 font-semibold">Sign Up</Text>
           </Link>
         </View>
+
+        {showSupportMessage && (
+          <View className="mt-4 rounded-xl border border-yellow-300 bg-yellow-50 p-4">
+            <Text className="font-semibold text-yellow-900">
+              Your account has been banned due to Some Reasons.
+            </Text>
+
+            <TouchableOpacity
+              onPress={() =>
+                Linking.openURL(
+                  `mailto:support@shoehub.com?subject=${subject}&body=${body}`,
+                )
+              }
+            >
+              <Text className="mt-2 font-medium text-blue-600">
+                Contact Support
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </ScrollView>
   );

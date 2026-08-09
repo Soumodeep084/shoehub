@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/card";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { CouponUsageTable } from "@/components/admin/coupons/coupon-usage-table";
-import { UsageRow } from "@/types/admin/coupons";
+import { CouponUsageRow } from "@/types/admin/table-usages";
 
 interface CouponDetailPageProps {
   params: Promise<{ id: string }>;
@@ -37,7 +37,7 @@ export default async function CouponDetailPage({
     notFound();
   }
 
-  const usagesData: UsageRow[] = coupon.usages.map((u) => ({
+  const usagesData: CouponUsageRow[] = coupon.usages.map((u) => ({
     id: u.id,
     userName: u.userName,
     userEmail: u.userEmail,

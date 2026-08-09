@@ -26,7 +26,9 @@ interface OrderState {
   createOrder: (
     token: string,
     addressId: string,
-    paymentMethod: "COD" | "ONLINE"
+    paymentMethod: "COD" | "ONLINE",
+    couponCode?: string | null,
+    bankOfferId?: string | null
   ) => Promise<CreateOrderResponse>;
 
   createPaymentIntent: (
@@ -39,6 +41,12 @@ interface OrderState {
     token: string,
     orderId: string
   ) => Promise<UpdatePaymentStatusResponse>;
+
+  cancelOrder: (
+    token: string,
+    id: string,
+    reason: string
+  ) => Promise<Order>;
 
   fetchOrders: (token: string) => Promise<void>;
   fetchOrderById: (token: string, id: string) => Promise<Order | null>;
@@ -74,14 +82,19 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     return res.json();
   },
 
-  createOrder: async (token, addressId, paymentMethod) => {
+  createOrder: async (token, addressId, paymentMethod, couponCode, bankOfferId) => {
     const response = await fetch(`${BACKEND_URL}/api/orders`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ addressId, paymentMethod }),
+      body: JSON.stringify({
+        addressId,
+        paymentMethod,
+        ...(couponCode ? { couponCode } : {}),
+        ...(bankOfferId ? { bankOfferId } : {}),
+      }),
     });
 
     if (!response.ok) {
@@ -174,6 +187,42 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       return order;
     } finally {
       set({ isDetailLoading: false });
+    }
+  },
+
+  cancelOrder: async (token, id, reason) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/orders/${id}/cancel`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reason }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to cancel order");
+      }
+
+      const updatedOrder = (await res.json()) as Order;
+
+      set((state) => ({
+        orders: state.orders.map((o) =>
+          o.id === id ? updatedOrder : o
+        ),
+        selectedOrder:
+          state.selectedOrder?.id === id ? updatedOrder : state.selectedOrder,
+      }));
+
+      return updatedOrder;
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    } finally {
+      set({ isLoading: false });
     }
   },
 

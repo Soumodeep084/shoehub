@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
 
         // Price Boundaries Filter (applies to basePrice or salePrice)
         if (minPriceParam || maxPriceParam) {
-            const priceFilter: any = {};
+            const priceFilter: any = {};  
             if (minPriceParam) priceFilter.gte = parseFloat(minPriceParam);
             if (maxPriceParam) priceFilter.lte = parseFloat(maxPriceParam);
 
@@ -65,7 +66,7 @@ export async function GET(req: Request) {
         }
 
         // 3. Build complex dynamic sorting clauses
-        let orderByClause: any = { createdAt: "desc" }; // Default sorting baseline
+        let orderByClause: any = { createdAt: "desc" }; // @typescript-eslint/no-explicit-any
 
         if (trending === "true") {
             orderByClause = { soldCount: "desc" };

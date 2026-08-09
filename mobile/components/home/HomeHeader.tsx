@@ -1,4 +1,7 @@
 import { useUserStore } from "@/store/userStore";
+import { useNotificationStore } from "@/store/notificationStore";
+import { useAuth } from "@clerk/expo";
+import { useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { TouchableOpacity, Text, View } from "react-native";
 
@@ -6,14 +9,29 @@ type HomeHeaderProps = {
   onSearchPress?: () => void;
   onWishlistPress?: () => void;
   onAvatarPress?: () => void;
+  onNotificationPress?: () => void;
 };
 
 export const HomeHeader = ({
   onSearchPress,
   onWishlistPress,
   onAvatarPress,
+  onNotificationPress,
 }: HomeHeaderProps) => {
   const avatarLabel = useUserStore((state) => state.avatarLabel);
+  const { getToken } = useAuth();
+  const unreadCount = useNotificationStore((state) => state.unreadCount);
+  const fetchUnreadCount = useNotificationStore((state) => state.fetchUnreadCount);
+
+  useEffect(() => {
+    const loadUnread = async () => {
+      const token = await getToken();
+      if (token) {
+        await fetchUnreadCount(token);
+      }
+    };
+    loadUnread().catch(() => undefined);
+  }, [getToken, fetchUnreadCount]);
 
   return (
     <View className="bg-white px-6 pt-2 pb-4">
@@ -49,6 +67,21 @@ export const HomeHeader = ({
             className="h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white shadow-sm shadow-black/5"
           >
             <Ionicons name="heart-outline" size={18} color="#111827" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onNotificationPress}
+            activeOpacity={0.82}
+            className="h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white shadow-sm shadow-black/5 relative"
+          >
+            <Ionicons name="notifications-outline" size={18} color="#111827" />
+            {unreadCount > 0 ? (
+              <View className="absolute -top-1 -right-1 bg-red-600 rounded-full min-w-[16px] h-4 px-1 items-center justify-center border border-white">
+                <Text className="text-[9px] font-black text-white text-center leading-3">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Text>
+              </View>
+            ) : null}
           </TouchableOpacity>
 
           <TouchableOpacity
